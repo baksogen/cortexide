@@ -95,12 +95,79 @@ export class NativeWebContentExtractorService implements IWebContentExtractorSer
 
 	private async extractAX(win: BrowserWindow, uri: URI): Promise<WebContentExtractResult> {
 		await win.loadURL(uri.toString(true));
-		win.webContents.debugger.attach('1.1');
-		const result: { nodes: AXNode[] } = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
-		const str = convertAXTreeToMarkdown(uri, result.nodes);
-		this._logger.info(`[NativeWebContentExtractorService] Content extracted from ${uri}`);
-		this._logger.trace(`[NativeWebContentExtractorService] Extracted content: ${str}`);
-		return { status: 'ok', result: str };
+
+		// Check if this is a JSON API endpoint
+		const isJsonApi = uri.toString(true).includes('format=json') || uri.toString(true).includes('/api/') || uri.path.includes('.json');
+
+		// Wait for page to load (with timeout)
+		await Promise.race([
+			new Promise<void>((resolve) => {
+				win.webContents.once('dom-ready', () => {
+					setTimeout(resolve, 500);
+				});
+			}),
+			new Promise<void>((resolve) => {
+				win.webContents.once('did-finish-load', () => {
+					setTimeout(resolve, 500);
+				});
+			}),
+			new Promise<void>((resolve) => setTimeout(resolve, 8000)) // 8 second timeout
+		]);
+
+		// For JSON APIs, try to extract raw JSON using JavaScript before accessibility tree
+		if (isJsonApi) {
+			try {
+				const rawText = await Promise.race([
+					win.webContents.executeJavaScript(`
+						(() => {
+							// JSON APIs often render in <pre> tags or as plain text
+							const preTag = document.querySelector('pre');
+							if (preTag && preTag.textContent) {
+								return preTag.textContent.trim();
+							}
+							if (document.body) {
+								const bodyText = document.body.innerText || document.body.textContent || '';
+								if (bodyText.trim()) {
+									return bodyText.trim();
+								}
+							}
+							return document.documentElement.innerText || document.documentElement.textContent || '';
+						})()
+					`),
+					new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+				]) as string;
+
+				if (rawText && rawText.trim()) {
+					const trimmed = rawText.trim();
+					// Validate it looks like JSON
+					if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+						this._logger.info(`[NativeWebContentExtractorService] Raw JSON content extracted from ${uri}`);
+						return { status: 'ok', result: trimmed };
+					}
+				}
+			} catch (error) {
+				this._logger.warn(`[NativeWebContentExtractorService] Failed to extract JSON via JavaScript from ${uri}: ${error}`);
+			}
+		}
+
+		// Fallback to accessibility tree extraction (for HTML pages or if JSON extraction failed)
+		try {
+			win.webContents.debugger.attach('1.1');
+			const result: { nodes: AXNode[] } = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
+			const str = convertAXTreeToMarkdown(uri, result.nodes);
+			this._logger.info(`[NativeWebContentExtractorService] Content extracted from ${uri}`);
+			this._logger.trace(`[NativeWebContentExtractorService] Extracted content: ${str.substring(0, 200)}...`);
+			return { status: 'ok', result: str };
+		} finally {
+			// Detach debugger when done
+			try {
+				if (win.webContents.debugger.isAttached()) {
+					win.webContents.debugger.detach();
+				}
+			} catch (e) {
+				// Ignore detach errors
+			}
+		}
 	}
 
 	private interceptRedirects(win: BrowserWindow, uri: URI, store: DisposableStore) {

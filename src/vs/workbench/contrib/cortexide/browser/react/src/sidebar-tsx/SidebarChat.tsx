@@ -1340,6 +1340,15 @@ const UserMessageComponent = ({ chatMessage, messageIdx, isCheckpointGhost, curr
 			// cancel any streams on this thread - use subscribed state
 			const threadId = currentThreadId
 
+			// Defensive check: verify the message is still a user message before editing
+			const thread = chatThreadsState.allThreads[threadId]
+			if (!thread || !thread.messages || thread.messages[messageIdx]?.role !== 'user') {
+				console.error('Error while editing message: Message is not a user message or no longer exists')
+				setIsBeingEdited(false)
+				chatThreadsService.setCurrentlyFocusedMessageIdx(undefined)
+				return
+			}
+
 			await chatThreadsService.abortRunning(threadId)
 
 			// update state
@@ -3270,7 +3279,7 @@ const PlanComponent = React.memo(({ message, isCheckpointGhost, threadId, messag
 														<div className="text-void-fg-3 text-xs mb-2 font-medium">Expected Tools:</div>
 														<div className="flex flex-wrap gap-1.5">
 															{step.tools.map((tool, i) => (
-																<span key={i} className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-xs rounded border border-blue-500/20">
+																<span key={`${step.stepNumber}-tool-${tool}-${i}`} className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-xs rounded border border-blue-500/20">
 																	{tool}
 																</span>
 															))}
@@ -3290,7 +3299,7 @@ const PlanComponent = React.memo(({ message, isCheckpointGhost, threadId, messag
 																const isError = toolMsg.type === 'tool_error'
 
 																return (
-																	<div key={i} className={`p-2 rounded border text-xs ${
+																	<div key={toolId} className={`p-2 rounded border text-xs ${
 																		isSuccess ? 'bg-green-500/10 border-green-500/20' :
 																		isError ? 'bg-red-500/10 border-red-500/20' :
 																		'bg-blue-500/10 border-blue-500/20'

@@ -54,6 +54,12 @@ class CortexideModelService extends Disposable implements ICortexideModelService
 
 	initializeModel = async (uri: URI) => {
 		try {
+			// Validate URI is actually a URI instance
+			if (!uri || typeof uri.fsPath !== 'string') {
+				console.debug('InitializeModel error: Invalid URI provided', uri);
+				return;
+			}
+
 			const fsPath = uri.fsPath;
 
 			// Check cache first

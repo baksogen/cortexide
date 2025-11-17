@@ -575,7 +575,8 @@ body.monaco-workbench {
 	color: var(--cortex-text-muted) !important;
 	border-radius: 14px !important;
 	border: 1px solid transparent !important;
-	padding: 6px 10px !important;
+	padding: 9px 12px !important;
+	min-height: 40px !important;
 }
 
 .monaco-workbench .quick-input-widget .quick-input-list .quick-input-list-entry .quick-input-list-label {

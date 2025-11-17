@@ -63,11 +63,11 @@ export const VoidOnboarding = () => {
 }
 
 const VoidIcon = () => (
-	<div className="w-full max-w-[220px] aspect-square rounded-full border border-white/15 bg-white/5 shadow-[0_45px_120px_rgba(0,0,0,0.85)] flex items-center justify-center overflow-hidden">
+	<div className="w-full max-w-[220px] aspect-square rounded-full border border-white/10 bg-black shadow-[0_45px_120px_rgba(0,0,0,0.95)] overflow-hidden">
 		<img
 			src={HERO_LOGO_URI}
 			alt="CortexIDE logo"
-			className="w-[78%] h-[78%] object-contain opacity-95"
+			className="w-full h-full object-contain opacity-95"
 			draggable={false}
 		/>
 	</div>

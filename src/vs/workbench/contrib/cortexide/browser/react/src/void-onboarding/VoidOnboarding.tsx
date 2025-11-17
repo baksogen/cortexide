@@ -42,9 +42,10 @@ export const VoidOnboarding = () => {
 		<div className={`@@void-scope ${isDark ? 'dark' : ''}`}>
 			<div
 				className={`
-					fixed inset-0 z-[99999] flex items-center justify-center px-6 py-12
+					fixed inset-0 z-[99999] flex items-start justify-center px-6 py-12
 					bg-[#050507]
 					backdrop-blur-[28px]
+					overflow-y-auto
 					transition-all duration-700 ease-in-out
 					${isOnboardingComplete ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 pointer-events-auto'}
 				`}
@@ -53,7 +54,7 @@ export const VoidOnboarding = () => {
 				}}
 			>
 				<ErrorBoundary>
-					<div className="w-full max-w-[1200px]">
+					<div className="w-full max-w-[1200px] py-6">
 						<VoidOnboardingContent />
 					</div>
 				</ErrorBoundary>
@@ -159,7 +160,7 @@ const AddProvidersPage = ({ pageIndex, setPageIndex }: { pageIndex: number, setP
 	}, [errorMessage]);
 
 	return (
-		<div className="flex flex-col gap-8 w-full h-[80vh] max-w-[1000px] mx-auto">
+		<div className="flex flex-col gap-8 w-full min-h-[75vh] max-w-[1000px] mx-auto">
 			<div className="space-y-2 text-center md:text-left">
 				<p className="text-xs uppercase tracking-[0.35em] text-void-fg-4">Step 02</p>
 				<h2 className="text-4xl font-light text-void-fg-0">Choose your model providers</h2>
@@ -390,12 +391,14 @@ const OnboardingPageShell = ({ top, bottom, content, hasMaxWidth = true, classNa
 	className?: string,
 }) => {
 	return (
-		<div className={`h-[80vh] w-full ${className}`}>
+		<div className={`min-h-[70vh] w-full ${className}`}>
 			<div className={`
 				text-lg flex flex-col gap-6 w-full h-full mx-auto px-8 py-10
 				rounded-[32px] border border-void-border-3 bg-void-bg-2/70 backdrop-blur-xl
 				shadow-[0_30px_90px_rgba(0,0,0,0.45)]
 				${hasMaxWidth ? 'max-w-[720px]' : ''}
+				max-h-[calc(100vh-6rem)]
+				overflow-y-auto
 			`}>
 				{top && <FadeIn className='w-full mb-auto'>{top}</FadeIn>}
 				{content && <FadeIn className='w-full my-auto'>{content}</FadeIn>}

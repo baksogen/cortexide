@@ -49,7 +49,7 @@ export const PastThreadsList = ({ className = '' }: { className?: string }) => {
 	const displayThreads = showAll ? sortedThreadIds : sortedThreadIds.slice(0, numInitialThreads);
 
 	return (
-		<div className={`flex flex-col mb-2 gap-2 w-full text-nowrap text-void-fg-3 select-none relative ${className}`}>
+		<div className={`flex flex-col mb-2 gap-2 w-full text-nowrap text-void-fg-2 select-none relative ${className}`}>
 			{displayThreads.length === 0 // this should never happen
 				? <></>
 				: displayThreads.map((threadId, i) => {
@@ -225,21 +225,17 @@ const PastThreadElement = ({ pastThread, idx, hoveredIdx, setHoveredIdx, isRunni
 
 	const numMessages = pastThread.messages.filter((msg) => msg.role === 'assistant' || msg.role === 'user').length;
 
-	const detailsHTML = <span
-	// data-tooltip-id='void-tooltip'
-	// data-tooltip-content={`Last modified ${formatTime(new Date(pastThread.lastModified))}`}
-	// data-tooltip-place='top'
-	>
-		<span className='opacity-60'>{numMessages}</span>
-		{` `}
-		{formatDate(new Date(pastThread.lastModified))}
-		{/* {` messages `} */}
-	</span>
+	const detailsHTML = (
+		<span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-void-bg-2 text-[10px] tracking-wide uppercase text-void-fg-3'>
+			<span>{numMessages} msg</span>
+			<span className='opacity-80'>{formatDate(new Date(pastThread.lastModified))}</span>
+		</span>
+	)
 
 	return <div
 		key={pastThread.id}
 		className={`
-			py-1 px-2 rounded text-sm bg-zinc-700/5 hover:bg-zinc-700/10 dark:bg-zinc-300/5 dark:hover:bg-zinc-300/10 cursor-pointer opacity-80 hover:opacity-100
+			group px-3 py-2 rounded-xl border border-void-border-3/70 bg-void-bg-1/40 hover:bg-void-bg-2/70 cursor-pointer text-sm text-void-fg-1 transition-all duration-150 ease-out shadow-[0_8px_20px_rgba(0,0,0,0.35)] hover:-translate-y-0.5
 		`}
 		onClick={() => {
 			chatThreadsService.switchToThread(pastThread.id);
@@ -247,16 +243,16 @@ const PastThreadElement = ({ pastThread, idx, hoveredIdx, setHoveredIdx, isRunni
 		onMouseEnter={() => setHoveredIdx(idx)}
 		onMouseLeave={() => setHoveredIdx(null)}
 	>
-		<div className="flex items-center justify-between gap-1">
-			<span className="flex items-center gap-2 min-w-0 overflow-hidden">
+		<div className="flex items-center justify-between gap-2">
+			<span className="flex items-center gap-2 min-w-0 overflow-hidden text-void-fg-2">
                 {/* status icon */}
                 {isRunning === 'LLM' || isRunning === 'tool' || isRunning === 'preparing' ? (
-                    <LoaderCircle className="animate-spin bg-void-stroke-1 flex-shrink-0 flex-grow-0" size={14} />
+                    <LoaderCircle className="animate-spin text-void-fg-1 flex-shrink-0 flex-grow-0" size={14} />
                 ) : isRunning === 'awaiting_user' ? (
-                    <MessageCircleQuestion className="bg-void-stroke-1 flex-shrink-0 flex-grow-0" size={14} />
+                    <MessageCircleQuestion className="text-void-fg-1 flex-shrink-0 flex-grow-0" size={14} />
                 ) : null}
 				{/* name */}
-				<span className="truncate overflow-hidden text-ellipsis"
+				<span className="truncate overflow-hidden text-ellipsis text-void-fg-1"
 					data-tooltip-id='void-tooltip'
 					data-tooltip-content={numMessages + ' messages'}
 					data-tooltip-place='top'
@@ -265,7 +261,7 @@ const PastThreadElement = ({ pastThread, idx, hoveredIdx, setHoveredIdx, isRunni
 				{/* <span className='opacity-60'>{`(${numMessages})`}</span> */}
 			</span>
 
-			<div className="flex items-center gap-x-1 opacity-60">
+			<div className="flex items-center gap-x-1 opacity-80 text-void-fg-3">
 				{idx === hoveredIdx ?
 					<>
 						{/* trash icon */}
@@ -275,7 +271,7 @@ const PastThreadElement = ({ pastThread, idx, hoveredIdx, setHoveredIdx, isRunni
 						<TrashButton threadId={pastThread.id} />
 					</>
 					: <>
-						{detailsHTML}
+						<div className="opacity-90">{detailsHTML}</div>
 					</>
 				}
 			</div>

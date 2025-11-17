@@ -61,6 +61,9 @@ import './cortexideOnboardingService.js'
 // register misc service
 import './miscWokrbenchContrib.js'
 
+// remove built-in chat surfaces we don't use
+import './hideBuiltinChat.js'
+
 // register file service (for explorer context menu)
 import './fileService.js'
 

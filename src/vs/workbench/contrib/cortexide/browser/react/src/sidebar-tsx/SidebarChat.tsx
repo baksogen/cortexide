@@ -502,10 +502,10 @@ export const VoidChatArea: React.FC<CortexideChatAreaProps> = ({
 			className={`
 				gap-x-1
                 flex flex-col p-2.5 relative input text-left shrink-0
-                rounded-lg
-                bg-void-bg-1
+                rounded-2xl
+                bg-[#030304]
 				transition-all duration-200
-				border border-void-border-3 focus-within:border-void-border-1 hover:border-void-border-1
+				border border-[rgba(255,255,255,0.08)] focus-within:border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.12)]
 				${isDragOver ? 'border-blue-500 bg-blue-500/10' : ''}
 				max-h-[80vh] overflow-y-auto
                 ${className}
@@ -1389,9 +1389,10 @@ const UserMessageComponent = ({ chatMessage, messageIdx, isCheckpointGhost, curr
 		>
 			<VoidInputBox2
 				enableAtToMention
+				appearance="chatDark"
 				ref={setTextAreaRef}
-				className='min-h-[81px] max-h-[500px] px-0.5'
-				placeholder="Edit your message..."
+				className='min-h-[60px] px-3 py-3 rounded-2xl'
+				placeholder="Plan, @ for context, / for commands"
 				onChangeText={(text) => setIsDisabled(!text)}
 				onFocus={() => {
 					setIsFocused(true)
@@ -4574,7 +4575,7 @@ export const SidebarChat = () => {
 			enableAtToMention
 			appearance="chatDark"
 			className={`min-h-[60px] px-3 py-3 rounded-2xl`}
-			placeholder={`Message...`}
+			placeholder="Plan, @ for context"
 			onChangeText={onChangeText}
 			onKeyDown={onKeyDown}
 			onFocus={() => { chatThreadsService.setCurrentlyFocusedMessageIdx(undefined) }}

@@ -812,10 +812,10 @@ export const VoidInputBox2 = forwardRef<HTMLTextAreaElement, InputBox2Props>(fun
 
 	const baseStyle: React.CSSProperties = isChatDark
 		? {
-			background: '#030304',
+			background: 'transparent',
 			color: '#fff',
-			border: '1px solid rgba(255,255,255,0.08)',
-			boxShadow: '0 20px 60px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.02)',
+			border: 'none',
+			boxShadow: 'none',
 		}
 		: {
 			background: asCssVariable(inputBackground),

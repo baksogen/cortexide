@@ -1,7 +1,7 @@
-/*--------------------------------------------------------------------------------------
- *  Copyright 2025 Glass Devtools, Inc. All rights reserved.
- *  Licensed under the Apache License, Version 2.0. See LICENSE.txt for more information.
- *--------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 
 import { Registry } from '../../../../platform/registry/common/platform.js';
 import {
@@ -66,7 +66,7 @@ class SidebarViewPane extends ViewPane {
 		// @ICodeEditorService private readonly editorService: ICodeEditorService,
 		// @IContextKeyService private readonly editorContextKeyService: IContextKeyService,
 	) {
-		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService)
+		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
 
 	}
 
@@ -75,20 +75,20 @@ class SidebarViewPane extends ViewPane {
 	protected override renderBody(parent: HTMLElement): void {
 		super.renderBody(parent);
 		// parent.style.overflow = 'auto'
-		parent.style.userSelect = 'text'
+		parent.style.userSelect = 'text';
 
 		// gets set immediately
 		this.instantiationService.invokeFunction(accessor => {
 			// mount react
 			const disposeFn: (() => void) | undefined = mountSidebar(parent, accessor)?.dispose;
-			this._register(toDisposable(() => disposeFn?.()))
+			this._register(toDisposable(() => disposeFn?.()));
 		});
 	}
 
 	protected override layoutBody(height: number, width: number): void {
-		super.layoutBody(height, width)
-		this.element.style.height = `${height}px`
-		this.element.style.width = `${width}px`
+		super.layoutBody(height, width);
+		this.element.style.height = `${height}px`;
+		this.element.style.width = `${width}px`;
 	}
 
 }
@@ -101,8 +101,8 @@ class SidebarViewPane extends ViewPane {
 // const voidViewIcon = registerIcon('void-view-icon', voidThemeIcon, localize('voidViewIcon', 'View icon of the Void chat view.'));
 
 // called VIEWLET_ID in other places for some reason
-export const CORTEXIDE_VIEW_CONTAINER_ID = 'workbench.view.cortexide'
-export const CORTEXIDE_VIEW_ID = CORTEXIDE_VIEW_CONTAINER_ID
+export const CORTEXIDE_VIEW_CONTAINER_ID = 'workbench.view.cortexide';
+export const CORTEXIDE_VIEW_ID = CORTEXIDE_VIEW_CONTAINER_ID;
 
 // Register view container
 const viewContainerRegistry = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry);
@@ -117,7 +117,7 @@ const container = viewContainerRegistry.registerViewContainer({
 	order: 1,
 
 	rejectAddedViews: true,
-	icon: FileAccess.asBrowserUri('vs/workbench/browser/media/void-icon-sm.png'), // CortexIDE logo
+	icon: FileAccess.asBrowserUri('vs/workbench/browser/media/code-icon.svg'), // CortexIDE logo
 
 
 }, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: true });
@@ -129,7 +129,7 @@ const viewsRegistry = Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry);
 viewsRegistry.registerViews([{
 	id: CORTEXIDE_VIEW_ID,
 	hideByDefault: false, // start open
-	containerIcon: FileAccess.asBrowserUri('vs/workbench/browser/media/void-icon-sm.png'), // CortexIDE logo
+	containerIcon: FileAccess.asBrowserUri('vs/workbench/browser/media/code-icon.svg'), // CortexIDE logo
 	name: nls.localize2('voidChat', ''), // this says ... : CHAT
 	ctorDescriptor: new SyncDescriptor(SidebarViewPane),
 	canToggleVisibility: false,
@@ -149,16 +149,16 @@ viewsRegistry.registerViews([{
 
 
 // open sidebar
-export const CORTEXIDE_OPEN_SIDEBAR_ACTION_ID = 'cortexide.openSidebar'
+export const CORTEXIDE_OPEN_SIDEBAR_ACTION_ID = 'cortexide.openSidebar';
 registerAction2(class extends Action2 {
 	constructor() {
 		super({
 			id: CORTEXIDE_OPEN_SIDEBAR_ACTION_ID,
-		title: 'Open CortexIDE Sidebar',
-		})
+			title: 'Open CortexIDE Sidebar',
+		});
 	}
 	run(accessor: ServicesAccessor): void {
-		const viewsService = accessor.get(IViewsService)
+		const viewsService = accessor.get(IViewsService);
 		viewsService.openViewContainer(CORTEXIDE_VIEW_CONTAINER_ID);
 	}
 });
@@ -168,7 +168,7 @@ export class SidebarStartContribution implements IWorkbenchContribution {
 	constructor(
 		@ICommandService private readonly commandService: ICommandService,
 	) {
-		this.commandService.executeCommand(CORTEXIDE_OPEN_SIDEBAR_ACTION_ID)
+		this.commandService.executeCommand(CORTEXIDE_OPEN_SIDEBAR_ACTION_ID);
 	}
 }
 registerWorkbenchContribution2(SidebarStartContribution.ID, SidebarStartContribution, WorkbenchPhase.AfterRestored);

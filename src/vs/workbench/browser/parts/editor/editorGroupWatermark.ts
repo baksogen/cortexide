@@ -116,11 +116,13 @@ export class EditorGroupWatermark extends Disposable {
 		this.icon = elements.icon; // store icon element to ensure it persists
 
 		// void icon style - ensure it's always visible
-		const logoUri = FileAccess.asBrowserUri('vs/workbench/browser/media/void-icon-sm.png');
+		const logoUri = FileAccess.asBrowserUri('vs/workbench/browser/media/code-icon.svg');
 		const logoUrl = asCSSUrl(logoUri);
 		const updateTheme = () => {
-			const theme = this.themeService.getColorTheme().type
-			const isDark = theme === ColorScheme.DARK || theme === ColorScheme.HIGH_CONTRAST_DARK
+			const theme = this.themeService.getColorTheme().type;
+			const filterValue = theme === ColorScheme.DARK || theme === ColorScheme.HIGH_CONTRAST_DARK
+				? 'drop-shadow(0 35px 60px rgba(0,0,0,0.55))'
+				: 'drop-shadow(0 35px 60px rgba(0,0,0,0.35))';
 			// Ensure icon is visible with proper dimensions - use inline styles to override CSS
 			this.icon.style.cssText = `
 				display: block !important;
@@ -130,18 +132,21 @@ export class EditorGroupWatermark extends Disposable {
 				min-width: 150px !important;
 				min-height: 150px !important;
 				max-width: 220px !important;
-				opacity: 0.5 !important;
+				opacity: 0.85 !important;
 				background-image: ${logoUrl} !important;
 				background-size: contain !important;
 				background-position: center !important;
 				background-repeat: no-repeat !important;
-				filter: ${isDark ? 'none' : 'invert(1)'} !important;
-			`
-		}
-		updateTheme()
+				border-radius: 0 !important;
+				background-color: transparent !important;
+				box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45) !important;
+				filter: ${filterValue} !important;
+			`;
+		};
+		updateTheme();
 		this._register(
 			this.themeService.onDidColorThemeChange(updateTheme)
-		)
+		);
 
 		this.registerListeners();
 
@@ -182,10 +187,12 @@ export class EditorGroupWatermark extends Disposable {
 
 		// Ensure icon is always visible after render - reapply styles
 		if (this.icon) {
-			const theme = this.themeService.getColorTheme().type
-			const isDark = theme === ColorScheme.DARK || theme === ColorScheme.HIGH_CONTRAST_DARK
-			const logoUri = FileAccess.asBrowserUri('vs/workbench/browser/media/void-icon-sm.png');
+			const theme = this.themeService.getColorTheme().type;
+			const logoUri = FileAccess.asBrowserUri('vs/workbench/browser/media/code-icon.svg');
 			const logoUrl = asCSSUrl(logoUri);
+			const filterValue = theme === ColorScheme.DARK || theme === ColorScheme.HIGH_CONTRAST_DARK
+				? 'drop-shadow(0 35px 60px rgba(0,0,0,0.55))'
+				: 'drop-shadow(0 35px 60px rgba(0,0,0,0.35))';
 			this.icon.style.cssText = `
 				display: block !important;
 				visibility: visible !important;
@@ -194,19 +201,22 @@ export class EditorGroupWatermark extends Disposable {
 				min-width: 150px !important;
 				min-height: 150px !important;
 				max-width: 220px !important;
-				opacity: 0.5 !important;
+				opacity: 0.85 !important;
 				background-image: ${logoUrl} !important;
 				background-size: contain !important;
 				background-position: center !important;
 				background-repeat: no-repeat !important;
-				filter: ${isDark ? 'none' : 'invert(1)'} !important;
-			`
+				border-radius: 0 !important;
+				background-color: transparent !important;
+				box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45) !important;
+				filter: ${filterValue} !important;
+			`;
 		}
 		const voidIconBox = append(this.shortcuts, $('.watermark-box'));
 		const recentsBox = append(this.shortcuts, $('div'));
-		recentsBox.style.display = 'flex'
-		recentsBox.style.flex = 'row'
-		recentsBox.style.justifyContent = 'center'
+		recentsBox.style.display = 'flex';
+		recentsBox.style.flex = 'row';
+		recentsBox.style.justifyContent = 'center';
 
 
 		const update = async () => {
@@ -235,31 +245,31 @@ export class EditorGroupWatermark extends Disposable {
 				voidIconBox.appendChild(buttonContainer);
 
 				// Open a folder
-				const openFolderButton = h('button')
-				openFolderButton.root.classList.add('void-openfolder-button')
-				openFolderButton.root.style.display = 'block'
-				openFolderButton.root.style.width = '124px' // Set width to 124px as requested
-				openFolderButton.root.textContent = 'Open Folder'
+				const openFolderButton = h('button');
+				openFolderButton.root.classList.add('void-openfolder-button');
+				openFolderButton.root.style.display = 'block';
+				openFolderButton.root.style.width = '124px'; // Set width to 124px as requested
+				openFolderButton.root.textContent = 'Open Folder';
 				openFolderButton.root.onclick = () => {
-					this.commandService.executeCommand(isMacintosh && isNative ? OpenFileFolderAction.ID : OpenFolderAction.ID)
+					this.commandService.executeCommand(isMacintosh && isNative ? OpenFileFolderAction.ID : OpenFolderAction.ID);
 					// if (this.contextKeyService.contextMatchesRules(ContextKeyExpr.and(WorkbenchStateContext.isEqualTo('workspace')))) {
 					// 	this.commandService.executeCommand(OpenFolderViaWorkspaceAction.ID);
 					// } else {
 					// 	this.commandService.executeCommand(isMacintosh ? 'workbench.action.files.openFileFolder' : 'workbench.action.files.openFolder');
 					// }
-				}
+				};
 				buttonContainer.appendChild(openFolderButton.root);
 
 				// Open SSH button
-				const openSSHButton = h('button')
-				openSSHButton.root.classList.add('void-openssh-button')
-				openSSHButton.root.style.display = 'block'
-				openSSHButton.root.style.backgroundColor = '#5a5a5a' // Made darker than the default gray
-				openSSHButton.root.style.width = '124px' // Set width to 124px as requested
-				openSSHButton.root.textContent = 'Open SSH'
+				const openSSHButton = h('button');
+				openSSHButton.root.classList.add('void-openssh-button');
+				openSSHButton.root.style.display = 'block';
+				openSSHButton.root.style.backgroundColor = '#5a5a5a'; // Made darker than the default gray
+				openSSHButton.root.style.width = '124px'; // Set width to 124px as requested
+				openSSHButton.root.textContent = 'Open SSH';
 				openSSHButton.root.onclick = () => {
 					this.viewsService.openViewContainer(REMOTE_EXPLORER_VIEWLET_ID);
-				}
+				};
 				buttonContainer.appendChild(openSSHButton.root);
 
 
@@ -276,7 +286,7 @@ export class EditorGroupWatermark extends Disposable {
 								fullPath = w.label || this.labelService.getWorkspaceLabel(w.folderUri, { verbose: Verbosity.LONG });
 							}
 							else {
-								return null
+								return null;
 								// fullPath = w.label || this.labelService.getWorkspaceLabel(w.workspace, { verbose: Verbosity.LONG });
 								// windowOpenable = { workspaceUri: w.workspace.configPath };
 							}
@@ -285,10 +295,10 @@ export class EditorGroupWatermark extends Disposable {
 							const { name, parentPath } = splitRecentLabel(fullPath);
 
 							const linkSpan = $('span');
-							linkSpan.classList.add('void-link')
-							linkSpan.style.display = 'flex'
-							linkSpan.style.gap = '4px'
-							linkSpan.style.padding = '8px'
+							linkSpan.classList.add('void-link');
+							linkSpan.style.display = 'flex';
+							linkSpan.style.gap = '4px';
+							linkSpan.style.padding = '8px';
 
 							linkSpan.addEventListener('click', e => {
 								this.hostService.openWindow([windowOpenable], {
@@ -314,11 +324,11 @@ export class EditorGroupWatermark extends Disposable {
 
 							linkSpan.appendChild(dirSpan);
 
-							return linkSpan
+							return linkSpan;
 						})
 							.filter(v => !!v)
 							.slice(0, 5) // take 5 most recent
-					)
+					);
 				}
 
 			}
@@ -327,95 +337,93 @@ export class EditorGroupWatermark extends Disposable {
 				// show them Void keybindings
 				const keys = this.keybindingService.lookupKeybinding(CORTEXIDE_CTRL_L_ACTION_ID);
 				const dl = append(voidIconBox, $('dl'));
-				dl.style.cursor = 'pointer'
-				dl.style.userSelect = 'none'
+				dl.style.cursor = 'pointer';
+				dl.style.userSelect = 'none';
 				const dt = append(dl, $('dt'));
-				dt.textContent = 'Chat'
-				dt.style.cursor = 'pointer'
-				dt.style.userSelect = 'none'
-				dt.style.transition = 'opacity 0.2s, color 0.2s'
+				dt.textContent = 'Chat';
+				dt.style.cursor = 'pointer';
+				dt.style.userSelect = 'none';
+				dt.style.transition = 'opacity 0.2s, color 0.2s';
 				const clickChatHandler = () => {
 					console.log('Chat clicked');
 					this.commandService.executeCommand(CORTEXIDE_CTRL_L_ACTION_ID).catch(err => {
 						console.error('Failed to execute Chat command:', err);
 					});
-				}
+				};
 				const hoverChatEnter = () => {
-					dt.style.opacity = '1'
-					dt.style.color = 'var(--vscode-textLink-foreground, var(--vscode-editorWatermark-foreground))'
-				}
+					dt.style.opacity = '1';
+					dt.style.color = 'var(--vscode-textLink-foreground, var(--vscode-editorWatermark-foreground))';
+				};
 				const hoverChatLeave = () => {
-					dt.style.opacity = ''
-					dt.style.color = ''
-				}
-				dl.onmouseenter = hoverChatEnter
-				dl.onmouseleave = hoverChatLeave
+					dt.style.opacity = '';
+					dt.style.color = '';
+				};
+				dl.onmouseenter = hoverChatEnter;
+				dl.onmouseleave = hoverChatLeave;
 				dl.onclick = (e: MouseEvent) => {
 					e.preventDefault();
 					e.stopPropagation();
 					clickChatHandler();
-				}
+				};
 				this.currentDisposables.add(addDisposableListener(dl, EventType.CLICK, (e: MouseEvent) => {
 					e.preventDefault();
 					e.stopPropagation();
 					clickChatHandler();
 				}));
-				dt.onmouseenter = hoverChatEnter
-				dt.onmouseleave = hoverChatLeave
+				dt.onmouseenter = hoverChatEnter;
+				dt.onmouseleave = hoverChatLeave;
 				const dd = append(dl, $('dd'));
-				dd.style.cursor = 'pointer'
-				dd.onmouseenter = hoverChatEnter
-				dd.onmouseleave = hoverChatLeave
+				dd.style.cursor = 'pointer';
+				dd.onmouseenter = hoverChatEnter;
+				dd.onmouseleave = hoverChatLeave;
 				const label = new KeybindingLabel(dd, OS, { renderUnboundKeybindings: true, ...defaultKeybindingLabelStyles });
-				if (keys)
-					label.set(keys);
+				if (keys) { label.set(keys); }
 				this.currentDisposables.add(label);
 
 
 				const keys2 = this.keybindingService.lookupKeybinding(CORTEXIDE_CTRL_K_ACTION_ID);
 				const dl2 = append(voidIconBox, $('dl'));
-				dl2.style.cursor = 'pointer'
-				dl2.style.userSelect = 'none'
+				dl2.style.cursor = 'pointer';
+				dl2.style.userSelect = 'none';
 				const dt2 = append(dl2, $('dt'));
-				dt2.textContent = 'Quick Edit'
-				dt2.style.cursor = 'pointer'
-				dt2.style.userSelect = 'none'
-				dt2.style.transition = 'opacity 0.2s, color 0.2s'
+				dt2.textContent = 'Quick Edit';
+				dt2.style.cursor = 'pointer';
+				dt2.style.userSelect = 'none';
+				dt2.style.transition = 'opacity 0.2s, color 0.2s';
 				const clickQuickEditHandler = () => {
 					console.log('Quick Edit clicked');
 					this.commandService.executeCommand(CORTEXIDE_CTRL_K_ACTION_ID).catch(err => {
 						console.error('Failed to execute Quick Edit command:', err);
 					});
-				}
+				};
 				const hoverQuickEditEnter = () => {
-					dt2.style.opacity = '1'
-					dt2.style.color = 'var(--vscode-textLink-foreground, var(--vscode-editorWatermark-foreground))'
-				}
+					dt2.style.opacity = '1';
+					dt2.style.color = 'var(--vscode-textLink-foreground, var(--vscode-editorWatermark-foreground))';
+				};
 				const hoverQuickEditLeave = () => {
-					dt2.style.opacity = ''
-					dt2.style.color = ''
-				}
-				dl2.onmouseenter = hoverQuickEditEnter
-				dl2.onmouseleave = hoverQuickEditLeave
+					dt2.style.opacity = '';
+					dt2.style.color = '';
+				};
+				dl2.onmouseenter = hoverQuickEditEnter;
+				dl2.onmouseleave = hoverQuickEditLeave;
 				dl2.onclick = (e: MouseEvent) => {
 					e.preventDefault();
 					e.stopPropagation();
 					clickQuickEditHandler();
-				}
+				};
 				this.currentDisposables.add(addDisposableListener(dl2, EventType.CLICK, (e: MouseEvent) => {
 					e.preventDefault();
 					e.stopPropagation();
 					clickQuickEditHandler();
 				}));
-				dt2.onmouseenter = hoverQuickEditEnter
-				dt2.onmouseleave = hoverQuickEditLeave
+				dt2.onmouseenter = hoverQuickEditEnter;
+				dt2.onmouseleave = hoverQuickEditLeave;
 				const dd2 = append(dl2, $('dd'));
-				dd2.style.cursor = 'pointer'
-				dd2.onmouseenter = hoverQuickEditEnter
-				dd2.onmouseleave = hoverQuickEditLeave
+				dd2.style.cursor = 'pointer';
+				dd2.onmouseenter = hoverQuickEditEnter;
+				dd2.onmouseleave = hoverQuickEditLeave;
 				const label2 = new KeybindingLabel(dd2, OS, { renderUnboundKeybindings: true, ...defaultKeybindingLabelStyles });
-				if (keys2)
-					label2.set(keys2);
+				if (keys2) { label2.set(keys2); }
 				this.currentDisposables.add(label2);
 
 				// const keys3 = this.keybindingService.lookupKeybinding('workbench.action.openGlobalKeybindings');

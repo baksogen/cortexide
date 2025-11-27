@@ -29,7 +29,7 @@ export class NativePolicyService extends AbstractPolicyService implements IPolic
 
 		await this.throttler.queue(() => new Promise<void>((c, e) => {
 			try {
-				this.watcher.value = createWatcher('OpenCortexIDE', this.productName, policyDefinitions, update => {
+				this.watcher.value = createWatcher('OpenCortexIDE', this.productName, policyDefinitions, (update: PolicyUpdate<IStringDictionary<PolicyDefinition>>) => {
 					this._onDidPolicyChange(update);
 					c();
 				});

@@ -1097,7 +1097,7 @@ export class GettingStartedPage extends EditorPane {
 		if (this.announcementList) { this.announcementList.dispose(); }
 
 		const announcementList = this.announcementList = new GettingStartedIndexList({
-			title: localize('announcements', "!!APP_NAME!! Announcements"),
+			title: localize('announcements', "CortexIDE Announcements"),
 			klass: 'announcements',
 			limit: 5,
 			empty: $('.empty-recent', {}, localize('noAnnouncements', "There are no current announcements.")),
@@ -1110,7 +1110,7 @@ export class GettingStartedPage extends EditorPane {
 
 			if (showExtras) {
 				const branch = this.productService.quality === 'insider' ? 'insider' : 'master';
-				await fetch(`https://raw.githubusercontent.com/!!GH_REPO_PATH!!/${branch}/announcements-extra.json`)
+				await fetch(`https://raw.githubusercontent.com/OpenCortexIDE/cortexide-binaries/${branch}/announcements-extra.json`)
 					.then(async res => {
 						if (res.ok) {
 							const extraAnnouncements = await res.json() as AnnouncementEntry[];

@@ -45,6 +45,11 @@ export const referenceGeneratedDepsByArch = {
 		'libnss3 (>= 2:3.30)',
 		'libnss3 (>= 3.26)',
 		'libpango-1.0-0 (>= 1.14.0)',
+		'libstdc++6 (>= 4.1.1)',
+		'libstdc++6 (>= 5)',
+		'libstdc++6 (>= 5.2)',
+		'libstdc++6 (>= 6)',
+		'libstdc++6 (>= 9)',
 		'libudev1 (>= 183)',
 		'libx11-6',
 		'libx11-6 (>= 2:1.4.99.1)',
@@ -56,7 +61,8 @@ export const referenceGeneratedDepsByArch = {
 		'libxkbcommon0 (>= 0.5.0)',
 		'libxkbfile1 (>= 1:1.1.0)',
 		'libxrandr2',
-		'xdg-utils (>= 1.0.2)'
+		'xdg-utils (>= 1.0.2)',
+		'zlib1g (>= 1:1.2.3.4)'
 	],
 	'armhf': [
 		'ca-certificates',

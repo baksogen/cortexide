@@ -9,10 +9,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TypeScriptLanguageServiceHost = void 0;
 const typescript_1 = __importDefault(require("typescript"));
-const node_fs_1 = __importDefault(require("node:fs"));
-const node_path_1 = require("node:path");
+const fs = require("fs");
+const path = require("path");
 function normalizePath(filePath) {
-    return (0, node_path_1.normalize)(filePath);
+    return path.normalize(filePath);
 }
 /**
  * A TypeScript language service host

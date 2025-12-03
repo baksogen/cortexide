@@ -212,7 +212,7 @@ function $if(test, onTrue, onFalse = event_stream_1.through()) {
     if (typeof test === 'boolean') {
         return test ? onTrue : onFalse;
     }
-    return (0, ternary_stream_1.default)(test, onTrue, onFalse);
+    return (0, ternary_stream_1)(test, onTrue, onFalse);
 }
 /** Operator that appends the js files' original path a sourceURL, so debug locations map */
 function appendOwnPathSourceURL() {

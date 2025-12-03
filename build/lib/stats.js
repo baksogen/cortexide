@@ -40,7 +40,7 @@ const _entries = new Map();
 function createStatsStream(group, log) {
     const entry = new Entry(group, 0, 0);
     _entries.set(entry.name, entry);
-    return event_stream_1.default.through(function (data) {
+    return event_stream_1.through(function (data) {
         const file = data;
         if (typeof file.path === 'string') {
             entry.totalCount += 1;

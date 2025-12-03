@@ -22,7 +22,7 @@ const glob_1 = require("glob");
 const gulp_1 = require("gulp");
 const path = require("path");
 const crypto_1 = require("crypto");
-const vinyl_1 = require("vinyl");
+const File = require("vinyl");
 const stats_1 = require("./stats");
 const util2 = require("./util");
 const gulp_filter_1 = require("gulp-filter");
@@ -44,7 +44,7 @@ function minifyExtensionResources(input) {
     return input
         .pipe(jsonFilter)
         .pipe((0, gulp_buffer_1)())
-        .pipe(event_stream_1.default.mapSync((f) => {
+        .pipe(event_stream_1.mapSync((f) => {
         const errors = [];
         const value = jsoncParser.parse(f.contents.toString('utf8'), errors, { allowTrailingComma: true });
         if (errors.length === 0) {
@@ -60,7 +60,7 @@ function updateExtensionPackageJSON(input, update) {
     return input
         .pipe(packageJsonFilter)
         .pipe((0, gulp_buffer_1)())
-        .pipe(event_stream_1.default.mapSync((f) => {
+        .pipe(event_stream_1.mapSync((f) => {
         const data = JSON.parse(f.contents.toString('utf8'));
         f.contents = Buffer.from(JSON.stringify(update(data)));
         return f;
@@ -92,7 +92,7 @@ function fromLocalWebpack(extensionPath, webpackConfigFileName, disableMangle) {
     const vsce = require('@vscode/vsce');
     const webpack = require('webpack');
     const webpackGulp = require('webpack-stream');
-    const result = event_stream_1.default.through();
+    const result = event_stream_1.through();
     const packagedDependencies = [];
     const packageJsonConfig = require(path.join(extensionPath, 'package.json'));
     if (packageJsonConfig.dependencies) {
@@ -111,7 +111,7 @@ function fromLocalWebpack(extensionPath, webpackConfigFileName, disableMangle) {
     vsce.listFiles({ cwd: extensionPath, packageManager: vsce.PackageManager.None, packagedDependencies }).then(fileNames => {
         const files = fileNames
             .map(fileName => path.join(extensionPath, fileName))
-            .map(filePath => new vinyl_1.default({
+            .map(filePath => new File({
             path: filePath,
             stat: fs.statSync(filePath),
             base: extensionPath,
@@ -119,7 +119,7 @@ function fromLocalWebpack(extensionPath, webpackConfigFileName, disableMangle) {
         }));
         // check for a webpack configuration files, then invoke webpack
         // and merge its output with the files stream.
-        const webpackConfigLocations = glob_1.default.sync(path.join(extensionPath, '**', webpackConfigFileName), { ignore: ['**/node_modules'] });
+        const webpackConfigLocations = glob_1.sync(path.join(extensionPath, '**', webpackConfigFileName), { ignore: ['**/node_modules'] });
         const webpackStreams = webpackConfigLocations.flatMap(webpackConfigPath => {
             const webpackDone = (err, stats) => {
                 (0, fancy_log_1)(`Bundled extension: ${ansi_colors_1.yellow(path.join(path.basename(extensionPath), path.relative(extensionPath, webpackConfigPath)))}...`);
@@ -155,12 +155,12 @@ function fromLocalWebpack(extensionPath, webpackConfigFileName, disableMangle) {
                 }
                 const relativeOutputPath = path.relative(extensionPath, webpackConfig.output.path);
                 return webpackGulp(webpackConfig, webpack, webpackDone)
-                    .pipe(event_stream_1.default.through(function (data) {
+                    .pipe(event_stream_1.through(function (data) {
                     data.stat = data.stat || {};
                     data.base = extensionPath;
                     this.emit('data', data);
                 }))
-                    .pipe(event_stream_1.default.through(function (data) {
+                    .pipe(event_stream_1.through(function (data) {
                     // source map handling:
                     // * rewrite sourceMappingURL
                     // * save to disk so that upload-task picks this up
@@ -174,7 +174,7 @@ function fromLocalWebpack(extensionPath, webpackConfigFileName, disableMangle) {
                 }));
             });
         });
-        event_stream_1.default.merge(...webpackStreams, event_stream_1.default.readArray(files))
+        event_stream_1.merge(...webpackStreams, event_stream_1.readArray(files))
             // .pipe(es.through(function (data) {
             // 	// debug
             // 	console.log('out', data.path, data.contents.length);
@@ -190,18 +190,18 @@ function fromLocalWebpack(extensionPath, webpackConfigFileName, disableMangle) {
 }
 function fromLocalNormal(extensionPath) {
     const vsce = require('@vscode/vsce');
-    const result = event_stream_1.default.through();
+    const result = event_stream_1.through();
     vsce.listFiles({ cwd: extensionPath, packageManager: vsce.PackageManager.Npm })
         .then(fileNames => {
         const files = fileNames
             .map(fileName => path.join(extensionPath, fileName))
-            .map(filePath => new vinyl_1.default({
+            .map(filePath => new File({
             path: filePath,
             stat: fs.statSync(filePath),
             base: extensionPath,
             contents: fs.createReadStream(filePath)
         }));
-        event_stream_1.default.readArray(files).pipe(result);
+        event_stream_1.readArray(files).pipe(result);
     })
         .catch(err => result.emit('error', err));
     return result.pipe((0, stats_1.createStatsStream)(path.basename(extensionPath)));
@@ -237,9 +237,9 @@ function fromVsix(vsixPath, { name: extensionName, version, sha256, metadata }) 
     const json = require('gulp-json-editor');
     (0, fancy_log_1)('Using local VSIX for extension:', ansi_colors_1.yellow(`${extensionName}@${version}`), '...');
     const packageJsonFilter = (0, gulp_filter_1)('package.json', { restore: true });
-    return gulp_1.default.src(vsixPath)
+    return gulp_1.src(vsixPath)
         .pipe((0, gulp_buffer_1)())
-        .pipe(event_stream_1.default.mapSync((f) => {
+        .pipe(event_stream_1.mapSync((f) => {
         const hash = crypto_1.default.createHash('sha256');
         hash.update(f.contents);
         const checksum = hash.digest('hex');
@@ -353,7 +353,7 @@ function packageNativeLocalExtensionsStream(forWeb, disableMangle) {
  * @returns a stream
  */
 function packageAllLocalExtensionsStream(forWeb, disableMangle) {
-    return event_stream_1.default.merge([
+    return event_stream_1.merge([
         packageNonNativeLocalExtensionsStream(forWeb, disableMangle),
         packageNativeLocalExtensionsStream(forWeb, disableMangle)
     ]);
@@ -365,7 +365,7 @@ function packageAllLocalExtensionsStream(forWeb, disableMangle) {
  */
 function doPackageLocalExtensionsStream(forWeb, disableMangle, native) {
     const nativeExtensionsSet = new Set(nativeExtensions);
-    const localExtensionsDescriptions = (glob_1.default.sync('extensions/*/package.json')
+    const localExtensionsDescriptions = (glob_1.sync('extensions/*/package.json')
         .map(manifestPath => {
         const absoluteManifestPath = path.join(root, manifestPath);
         const extensionPath = path.dirname(path.join(root, manifestPath));
@@ -376,7 +376,7 @@ function doPackageLocalExtensionsStream(forWeb, disableMangle, native) {
         .filter(({ name }) => excludedExtensions.indexOf(name) === -1)
         .filter(({ name }) => builtInExtensions.every(b => b.name !== name))
         .filter(({ manifestPath }) => (forWeb ? isWebExtension(require(manifestPath)) : true)));
-    const localExtensionsStream = minifyExtensionResources(event_stream_1.default.merge(...localExtensionsDescriptions.map(extension => {
+    const localExtensionsStream = minifyExtensionResources(event_stream_1.merge(...localExtensionsDescriptions.map(extension => {
         return fromLocal(extension.path, forWeb, disableMangle)
             .pipe((0, gulp_rename_1)(p => p.dirname = `extensions/${extension.name}/${p.dirname}`));
     })));
@@ -389,7 +389,7 @@ function doPackageLocalExtensionsStream(forWeb, disableMangle, native) {
         const productionDependencies = (0, dependencies_1.getProductionDependencies)('extensions/');
         const dependenciesSrc = productionDependencies.map(d => path.relative(root, d)).map(d => [`${d}/**`, `!${d}/**/{test,tests}/**`]).flat();
         if (dependenciesSrc.length > 0) {
-            result = event_stream_1.default.merge(localExtensionsStream, gulp_1.default.src(dependenciesSrc, { base: '.' })
+            result = event_stream_1.merge(localExtensionsStream, gulp_1.src(dependenciesSrc, { base: '.' })
                 .pipe(util2.cleanNodeModules(path.join(root, 'build', '.moduleignore')))
                 .pipe(util2.cleanNodeModules(path.join(root, 'build', `.moduleignore.${process.platform}`))));
         }
@@ -405,7 +405,7 @@ function packageMarketplaceExtensionsStream(forWeb) {
         ...builtInExtensions.filter(({ name }) => (forWeb ? !marketplaceWebExtensionsExclude.has(name) : true)),
         ...(forWeb ? webBuiltInExtensions : [])
     ];
-    const marketplaceExtensionsStream = minifyExtensionResources(event_stream_1.default.merge(...marketplaceExtensionsDescriptions
+    const marketplaceExtensionsStream = minifyExtensionResources(event_stream_1.merge(...marketplaceExtensionsDescriptions
         .map(extension => {
         const src = (0, builtInExtensions_1.getExtensionStream)(extension).pipe((0, gulp_rename_1)(p => p.dirname = `extensions/${p.dirname}`));
         return updateExtensionPackageJSON(src, (data) => {

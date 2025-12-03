@@ -124,7 +124,7 @@ function setExecutableBit(pattern) {
         return setBit;
     }
     const input = event_stream_1.through();
-    const filter = (0, gulp_filter_1.default)(pattern, { restore: true });
+    const filter = (0, gulp_filter_1)(pattern, { restore: true });
     const output = input
         .pipe(filter)
         .pipe(setBit)
@@ -153,7 +153,7 @@ function cleanNodeModules(rulePath) {
     const excludes = rules.filter(line => !/^!/.test(line)).map(line => `!**/node_modules/${line}`);
     const includes = rules.filter(line => /^!/.test(line)).map(line => `**/node_modules/${line.substr(1)}`);
     const input = event_stream_1.through();
-    const output = event_stream_1.merge(input.pipe((0, gulp_filter_1.default)(['**', ...excludes])), input.pipe((0, gulp_filter_1.default)(includes)));
+    const output = event_stream_1.merge(input.pipe((0, gulp_filter_1)(['**', ...excludes])), input.pipe((0, gulp_filter_1)(includes)));
     return event_stream_1.duplex(input, output);
 }
 function loadSourcemaps() {
@@ -281,7 +281,7 @@ function ensureDir(dirPath) {
     fs.mkdirSync(dirPath);
 }
 function rebase(count) {
-    return (0, gulp_rename_1.default)(f => {
+    return (0, gulp_rename_1)(f => {
         const parts = f.dirname ? f.dirname.split(/[\/\\]/) : [];
         f.dirname = parts.slice(count).join(path.sep);
     });

@@ -7,12 +7,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProductionDependencies = getProductionDependencies;
 const fs = require("fs");
 const path = require("path");
-const child_process_1 = require("child_process");
+const child_process = require("child_process");
 const root = fs.realpathSync(path.dirname(path.dirname(__dirname)));
 function getNpmProductionDependencies(folder) {
     let raw;
     try {
-        raw = child_process_1.default.execSync('npm ls --all --omit=dev --parseable', { cwd: folder, encoding: 'utf8', env: { ...process.env, NODE_ENV: 'production' }, stdio: [null, null, null] });
+        raw = child_process.execSync('npm ls --all --omit=dev --parseable', { cwd: folder, encoding: 'utf8', env: { ...process.env, NODE_ENV: 'production' }, stdio: [null, null, null] });
     }
     catch (err) {
         const regex = /^npm ERR! .*$/gm;

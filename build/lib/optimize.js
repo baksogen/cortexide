@@ -44,7 +44,7 @@ exports.bundleTask = bundleTask;
 exports.minifyTask = minifyTask;
 const event_stream_1 = require("event-stream");
 const gulp_1 = __importDefault(require("gulp"));
-const gulp_filter_1 = __importDefault(require("gulp-filter"));
+const gulp_filter_1 = require("gulp-filter");
 const path = require("path");
 const fs = require("fs");
 const pump_1 = __importDefault(require("pump"));
@@ -120,7 +120,7 @@ function bundleESMTask(opts) {
                     });
                 },
             };
-            const task = esbuild_1.default.build({
+            const task = esbuild_1.build({
                 bundle: true,
                 packages: 'external', // "external all the things", see https://esbuild.github.io/api/#packages
                 platform: 'neutral', // makes esm
@@ -192,8 +192,8 @@ function minifyTask(src, sourceMapBaseUrl) {
         const svgmin = require('gulp-svgmin');
         const esbuildFilter = (0, gulp_filter_1)('**/*.{js,css}', { restore: true });
         const svgFilter = (0, gulp_filter_1)('**/*.svg', { restore: true });
-        (0, pump_1.default)(gulp_1.default.src([src + '/**', '!' + src + '/**/*.map']), esbuildFilter, gulp_sourcemaps_1.default.init({ loadMaps: true }), event_stream_1.map((f, cb) => {
-            esbuild_1.default.build({
+        (0, pump_1)(gulp_1.default.src([src + '/**', '!' + src + '/**/*.map']), esbuildFilter, gulp_sourcemaps_1.default.init({ loadMaps: true }), event_stream_1.map((f, cb) => {
+            esbuild_1.build({
                 entryPoints: [f.path],
                 minify: true,
                 sourcemap: 'external',

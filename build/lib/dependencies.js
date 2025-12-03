@@ -5,10 +5,10 @@
  *--------------------------------------------------------------------------------------------*/
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProductionDependencies = getProductionDependencies;
-const fs_1 = require("fs");
-const path_1 = require("path");
+const fs = require("fs");
+const path = require("path");
 const child_process_1 = require("child_process");
-const root = fs_1.default.realpathSync(path_1.default.dirname(path_1.default.dirname(__dirname)));
+const root = fs.realpathSync(path.dirname(path.dirname(__dirname)));
 function getNpmProductionDependencies(folder) {
     let raw;
     try {
@@ -34,16 +34,16 @@ function getNpmProductionDependencies(folder) {
         raw = err.stdout;
     }
     return raw.split(/\r?\n/).filter(line => {
-        return !!line.trim() && path_1.default.relative(root, line) !== path_1.default.relative(root, folder);
+        return !!line.trim() && path.relative(root, line) !== path.relative(root, folder);
     });
 }
 function getProductionDependencies(folderPath) {
     const result = getNpmProductionDependencies(folderPath);
     // Account for distro npm dependencies
-    const realFolderPath = fs_1.default.realpathSync(folderPath);
-    const relativeFolderPath = path_1.default.relative(root, realFolderPath);
+    const realFolderPath = fs.realpathSync(folderPath);
+    const relativeFolderPath = path.relative(root, realFolderPath);
     const distroFolderPath = `${root}/.build/distro/npm/${relativeFolderPath}`;
-    if (fs_1.default.existsSync(distroFolderPath)) {
+    if (fs.existsSync(distroFolderPath)) {
         result.push(...getNpmProductionDependencies(distroFolderPath));
     }
     return [...new Set(result)];

@@ -60,7 +60,7 @@ function nls(options) {
         }
         const root = f.sourceMap.sourceRoot;
         if (root) {
-            source = path_1.default.join(root, source);
+            source = path.join(root, source);
         }
         const typescript = f.sourceMap.sourcesContent[0];
         if (!typescript) {
@@ -320,7 +320,7 @@ var _nls;
                 generated.column += lengthDiff;
                 patches.pop();
             }
-            source = rsm.sourceRoot ? path_1.default.relative(rsm.sourceRoot, m.source) : m.source;
+            source = rsm.sourceRoot ? path.relative(rsm.sourceRoot, m.source) : m.source;
             source = source.replace(/\\/g, '/');
             smg.addMapping({ source, name: m.name, original, generated });
         }, null, source_map_1.default.SourceMapConsumer.GENERATED_ORDER);

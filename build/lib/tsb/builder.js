@@ -162,9 +162,9 @@ function createTypeScriptBuilder(config, projectFile, cmd) {
                         if (!emitSourceMapsInStream && /\.js$/.test(file.name)) {
                             const sourcemapFile = output.outputFiles.filter(f => /\.js\.map$/.test(f.name))[0];
                             if (sourcemapFile) {
-                                const extname = path_1.default.extname(vinyl.relative);
-                                const basename = path_1.default.basename(vinyl.relative, extname);
-                                const dirname = path_1.default.dirname(vinyl.relative);
+                                const extname = path.extname(vinyl.relative);
+                                const basename = path.basename(vinyl.relative, extname);
+                                const dirname = path.dirname(vinyl.relative);
                                 const tsname = (dirname === '.' ? '' : dirname + '/') + basename + '.ts';
                                 let sourceMap = JSON.parse(sourcemapFile.text);
                                 sourceMap.sources[0] = tsname.replace(/\\/g, '/');
@@ -519,9 +519,9 @@ class LanguageServiceHost {
             try {
                 result = new VinylScriptSnapshot(new vinyl_1.default({
                     path: filename,
-                    contents: fs_1.default.readFileSync(filename),
+                    contents: fs.readFileSync(filename),
                     base: this.getCompilationSettings().outDir,
-                    stat: fs_1.default.statSync(filename)
+                    stat: fs.statSync(filename)
                 }));
                 this.addScriptSnapshot(filename, result);
             }
@@ -567,7 +567,7 @@ class LanguageServiceHost {
         return delete this._snapshots[filename];
     }
     getCurrentDirectory() {
-        return path_1.default.dirname(this._projectPath);
+        return path.dirname(this._projectPath);
     }
     getDefaultLibFileName(options) {
         return typescript_1.default.getDefaultLibFilePath(options);
@@ -615,7 +615,7 @@ class LanguageServiceHost {
         this._dependencies.resetNode(filename);
         // (1) ///-references
         info.referencedFiles.forEach(ref => {
-            const resolvedPath = path_1.default.resolve(path_1.default.dirname(filename), ref.fileName);
+            const resolvedPath = path.resolve(path.dirname(filename), ref.fileName);
             const normalizedPath = normalize(resolvedPath);
             this._dependencies.inertEdge(filename, normalizedPath);
         });
@@ -632,8 +632,8 @@ class LanguageServiceHost {
             let dirname = filename;
             let found = false;
             while (!found && dirname.indexOf(stopDirname) === 0) {
-                dirname = path_1.default.dirname(dirname);
-                let resolvedPath = path_1.default.resolve(dirname, ref.fileName);
+                dirname = path.dirname(dirname);
+                let resolvedPath = path.resolve(dirname, ref.fileName);
                 if (resolvedPath.endsWith('.js')) {
                     resolvedPath = resolvedPath.slice(0, -3);
                 }

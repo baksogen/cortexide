@@ -11,7 +11,7 @@ exports.writeISODate = writeISODate;
 exports.readISODate = readISODate;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-const root = path_1.default.join(__dirname, '..', '..');
+const root = path.join(__dirname, '..', '..');
 /**
  * Writes a `outDir/date` file with the contents of the build
  * so that other tasks during the build process can use it and
@@ -19,17 +19,17 @@ const root = path_1.default.join(__dirname, '..', '..');
  */
 function writeISODate(outDir) {
     const result = () => new Promise((resolve, _) => {
-        const outDirectory = path_1.default.join(root, outDir);
-        fs_1.default.mkdirSync(outDirectory, { recursive: true });
+        const outDirectory = path.join(root, outDir);
+        fs.mkdirSync(outDirectory, { recursive: true });
         const date = new Date().toISOString();
-        fs_1.default.writeFileSync(path_1.default.join(outDirectory, 'date'), date, 'utf8');
+        fs.writeFileSync(path.join(outDirectory, 'date'), date, 'utf8');
         resolve();
     });
     result.taskName = 'build-date-file';
     return result;
 }
 function readISODate(outDir) {
-    const outDirectory = path_1.default.join(root, outDir);
-    return fs_1.default.readFileSync(path_1.default.join(outDirectory, 'date'), 'utf8');
+    const outDirectory = path.join(root, outDir);
+    return fs.readFileSync(path.join(outDirectory, 'date'), 'utf8');
 }
 //# sourceMappingURL=date.js.map

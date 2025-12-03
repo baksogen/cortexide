@@ -9,7 +9,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.inlineMeta = inlineMeta;
 const event_stream_1 = __importDefault(require("event-stream"));
-const path_1 = require("path");
+const path = require("path");
 const packageJsonMarkerId = 'BUILD_INSERT_PACKAGE_CONFIGURATION';
 // TODO in order to inline `product.json`, more work is
 // needed to ensure that we cover all cases where modifications

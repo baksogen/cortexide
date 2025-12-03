@@ -57,7 +57,7 @@ const defaults = {
 const getOverrides = (() => {
     let value;
     return () => {
-        value ??= JSON.parse(fs_1.default.readFileSync(path_1.default.join(__dirname, '..', '..', 'tsfmt.json'), 'utf8'));
+        value ??= JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'tsfmt.json'), 'utf8'));
         return value;
     };
 })();

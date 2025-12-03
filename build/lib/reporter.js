@@ -52,7 +52,7 @@ class ErrorLog {
             .map(([, path, line, column, message]) => ({ path, line: parseInt(line), column: parseInt(column), message }));
         try {
             const logFileName = 'log' + (this.id ? `_${this.id}` : '');
-            fs_1.default.writeFileSync(path_1.default.join(buildLogFolder, logFileName), JSON.stringify(messages));
+            fs.writeFileSync(path.join(buildLogFolder, logFileName), JSON.stringify(messages));
         }
         catch (err) {
             //noop
@@ -68,9 +68,9 @@ function getErrorLog(id = '') {
     }
     return errorLog;
 }
-const buildLogFolder = path_1.default.join(path_1.default.dirname(path_1.default.dirname(__dirname)), '.build');
+const buildLogFolder = path.join(path.dirname(path.dirname(__dirname)), '.build');
 try {
-    fs_1.default.mkdirSync(buildLogFolder);
+    fs.mkdirSync(buildLogFolder);
 }
 catch (err) {
     // ignore
@@ -87,7 +87,7 @@ function createReporter(id) {
     result.end = (emitError) => {
         errors.length = 0;
         errorLog.onStart();
-        return event_stream_1.default.through(undefined, function () {
+        return event_stream_1.through(undefined, function () {
             errorLog.onEnd();
             if (emitError && errors.length > 0) {
                 if (!errors.__logged__) {

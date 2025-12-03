@@ -8,7 +8,7 @@ exports.getTargetStringFromTsConfig = getTargetStringFromTsConfig;
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-const path_1 = require("path");
+const path = require("path");
 const typescript_1 = __importDefault(require("typescript"));
 /**
  * Get the target (e.g. 'ES2024') from a tsconfig.json file.

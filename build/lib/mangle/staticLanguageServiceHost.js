@@ -21,7 +21,7 @@ class StaticLanguageServiceHost {
         if (parsed.error) {
             throw parsed.error;
         }
-        this._cmdLine = typescript_1.default.parseJsonConfigFileContent(parsed.config, typescript_1.default.sys, path_1.default.dirname(projectPath), existingOptions);
+        this._cmdLine = typescript_1.default.parseJsonConfigFileContent(parsed.config, typescript_1.default.sys, path.dirname(projectPath), existingOptions);
         if (this._cmdLine.errors.length > 0) {
             throw parsed.error;
         }
@@ -51,7 +51,7 @@ class StaticLanguageServiceHost {
         return result;
     }
     getCurrentDirectory() {
-        return path_1.default.dirname(this.projectPath);
+        return path.dirname(this.projectPath);
     }
     getDefaultLibFileName(options) {
         return typescript_1.default.getDefaultLibFilePath(options);

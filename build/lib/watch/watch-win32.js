@@ -13,7 +13,7 @@ const fs_1 = __importDefault(require("fs"));
 const vinyl_1 = __importDefault(require("vinyl"));
 const event_stream_1 = __importDefault(require("event-stream"));
 const gulp_filter_1 = __importDefault(require("gulp-filter"));
-const watcherPath = path_1.default.join(__dirname, 'watcher.exe');
+const watcherPath = path.join(__dirname, 'watcher.exe');
 function toChangeType(type) {
     switch (type) {
         case '0': return 'change';
@@ -37,7 +37,7 @@ function watch(root) {
             if (/^\.git/.test(changePath) || /(^|\\)out($|\\)/.test(changePath)) {
                 continue;
             }
-            const changePathFull = path_1.default.join(root, changePath);
+            const changePathFull = path.join(root, changePath);
             const file = new vinyl_1.default({
                 path: changePathFull,
                 base: root
@@ -63,7 +63,7 @@ function watch(root) {
 const cache = Object.create(null);
 module.exports = function (pattern, options) {
     options = options || {};
-    const cwd = path_1.default.normalize(options.cwd || process.cwd());
+    const cwd = path.normalize(options.cwd || process.cwd());
     let watcher = cache[cwd];
     if (!watcher) {
         watcher = cache[cwd] = watch(cwd);
@@ -76,7 +76,7 @@ module.exports = function (pattern, options) {
         .pipe((0, gulp_filter_1.default)(['**', '!.git{,/**}'], { dot: options.dot })) // ignore all things git
         .pipe((0, gulp_filter_1.default)(pattern, { dot: options.dot }))
         .pipe(event_stream_1.default.map(function (file, cb) {
-        fs_1.default.stat(file.path, function (err, stat) {
+        fs.stat(file.path, function (err, stat) {
             if (err && err.code === 'ENOENT') {
                 return cb(undefined, file);
             }
@@ -86,7 +86,7 @@ module.exports = function (pattern, options) {
             if (!stat.isFile()) {
                 return cb();
             }
-            fs_1.default.readFile(file.path, function (err, contents) {
+            fs.readFile(file.path, function (err, contents) {
                 if (err && err.code === 'ENOENT') {
                     return cb(undefined, file);
                 }

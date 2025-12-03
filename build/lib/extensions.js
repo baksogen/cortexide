@@ -17,7 +17,7 @@ exports.webpackExtensions = webpackExtensions;
 exports.buildExtensionMedia = buildExtensionMedia;
 const event_stream_1 = require("event-stream");
 const fs = require("fs");
-const child_process_1 = require("child_process");
+const child_process = require("child_process");
 const glob_1 = require("glob");
 const gulp_1 = require("gulp");
 const path = require("path");
@@ -567,7 +567,7 @@ async function esbuildExtensions(taskName, isWatch, scripts) {
             if (outputRoot) {
                 args.push('--outputRoot', outputRoot);
             }
-            const proc = child_process_1.default.execFile(process.argv[0], args, {}, (error, _stdout, stderr) => {
+            const proc = child_process.execFile(process.argv[0], args, {}, (error, _stdout, stderr) => {
                 if (error) {
                     return reject(error);
                 }

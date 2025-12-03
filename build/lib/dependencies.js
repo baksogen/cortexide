@@ -3,14 +3,11 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProductionDependencies = getProductionDependencies;
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
-const child_process_1 = __importDefault(require("child_process"));
+const fs_1 = require("fs");
+const path_1 = require("path");
+const child_process_1 = require("child_process");
 const root = fs_1.default.realpathSync(path_1.default.dirname(path_1.default.dirname(__dirname)));
 function getNpmProductionDependencies(folder) {
     let raw;
@@ -54,4 +51,3 @@ function getProductionDependencies(folderPath) {
 if (require.main === module) {
     console.log(JSON.stringify(getProductionDependencies(root), null, '  '));
 }
-//# sourceMappingURL=dependencies.js.map

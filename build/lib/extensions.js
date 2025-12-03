@@ -3,42 +3,6 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fromMarketplace = fromMarketplace;
 exports.fromVsix = fromVsix;
@@ -51,22 +15,22 @@ exports.scanBuiltinExtensions = scanBuiltinExtensions;
 exports.translatePackageJSON = translatePackageJSON;
 exports.webpackExtensions = webpackExtensions;
 exports.buildExtensionMedia = buildExtensionMedia;
-const event_stream_1 = __importDefault(require("event-stream"));
-const fs_1 = __importDefault(require("fs"));
-const child_process_1 = __importDefault(require("child_process"));
-const glob_1 = __importDefault(require("glob"));
-const gulp_1 = __importDefault(require("gulp"));
-const path_1 = __importDefault(require("path"));
-const crypto_1 = __importDefault(require("crypto"));
-const vinyl_1 = __importDefault(require("vinyl"));
+const event_stream_1 = require("event-stream");
+const fs_1 = require("fs");
+const child_process_1 = require("child_process");
+const glob_1 = require("glob");
+const gulp_1 = require("gulp");
+const path_1 = require("path");
+const crypto_1 = require("crypto");
+const vinyl_1 = require("vinyl");
 const stats_1 = require("./stats");
-const util2 = __importStar(require("./util"));
-const gulp_filter_1 = __importDefault(require("gulp-filter"));
-const gulp_rename_1 = __importDefault(require("gulp-rename"));
-const fancy_log_1 = __importDefault(require("fancy-log"));
-const ansi_colors_1 = __importDefault(require("ansi-colors"));
-const gulp_buffer_1 = __importDefault(require("gulp-buffer"));
-const jsoncParser = __importStar(require("jsonc-parser"));
+const util2 = require("./util");
+const gulp_filter_1 = require("gulp-filter");
+const gulp_rename_1 = require("gulp-rename");
+const fancy_log_1 = require("fancy-log");
+const ansi_colors_1 = require("ansi-colors");
+const gulp_buffer_1 = require("gulp-buffer");
+const jsoncParser = require("jsonc-parser");
 const dependencies_1 = require("./dependencies");
 const builtInExtensions_1 = require("./builtInExtensions");
 const getVersion_1 = require("./getVersion");
@@ -424,9 +388,14 @@ function doPackageLocalExtensionsStream(forWeb, disableMangle, native) {
         // also include shared production node modules
         const productionDependencies = (0, dependencies_1.getProductionDependencies)('extensions/');
         const dependenciesSrc = productionDependencies.map(d => path_1.default.relative(root, d)).map(d => [`${d}/**`, `!${d}/**/{test,tests}/**`]).flat();
-        result = event_stream_1.default.merge(localExtensionsStream, gulp_1.default.src(dependenciesSrc, { base: '.' })
-            .pipe(util2.cleanNodeModules(path_1.default.join(root, 'build', '.moduleignore')))
-            .pipe(util2.cleanNodeModules(path_1.default.join(root, 'build', `.moduleignore.${process.platform}`))));
+        if (dependenciesSrc.length > 0) {
+            result = event_stream_1.default.merge(localExtensionsStream, gulp_1.default.src(dependenciesSrc, { base: '.' })
+                .pipe(util2.cleanNodeModules(path_1.default.join(root, 'build', '.moduleignore')))
+                .pipe(util2.cleanNodeModules(path_1.default.join(root, 'build', `.moduleignore.${process.platform}`))));
+        }
+        else {
+            result = localExtensionsStream;
+        }
     }
     return (result
         .pipe(util2.setExecutableBit(['**/*.sh'])));
@@ -618,4 +587,3 @@ async function buildExtensionMedia(isWatch, outputRoot) {
         outputRoot: outputRoot ? path_1.default.join(root, outputRoot, path_1.default.dirname(p)) : undefined
     })));
 }
-//# sourceMappingURL=extensions.js.map

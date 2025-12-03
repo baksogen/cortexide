@@ -3,9 +3,6 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VinylStat = void 0;
 exports.incremental = incremental;
@@ -27,15 +24,15 @@ exports.rebase = rebase;
 exports.filter = filter;
 exports.streamToPromise = streamToPromise;
 exports.getElectronVersion = getElectronVersion;
-const event_stream_1 = __importDefault(require("event-stream"));
-const debounce_1 = __importDefault(require("debounce"));
-const gulp_filter_1 = __importDefault(require("gulp-filter"));
-const gulp_rename_1 = __importDefault(require("gulp-rename"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
-const rimraf_1 = __importDefault(require("rimraf"));
+const event_stream_1 = require("event-stream");
+const debounce_1 = require("debounce");
+const gulp_filter_1 = require("gulp-filter");
+const gulp_rename_1 = require("gulp-rename");
+const path_1 = require("path");
+const fs_1 = require("fs");
+const rimraf_1 = require("rimraf");
 const url_1 = require("url");
-const ternary_stream_1 = __importDefault(require("ternary-stream"));
+const ternary_stream_1 = require("ternary-stream");
 const root = path_1.default.dirname(path_1.default.dirname(__dirname));
 const NoCancellationToken = { isCancellationRequested: () => false };
 function incremental(streamProvider, initial, supportsCancellation) {
@@ -314,24 +311,6 @@ function getElectronVersion() {
     return { electronVersion, msBuildId };
 }
 class VinylStat {
-    dev;
-    ino;
-    mode;
-    nlink;
-    uid;
-    gid;
-    rdev;
-    size;
-    blksize;
-    blocks;
-    atimeMs;
-    mtimeMs;
-    ctimeMs;
-    birthtimeMs;
-    atime;
-    mtime;
-    ctime;
-    birthtime;
     constructor(stat) {
         this.dev = stat.dev ?? 0;
         this.ino = stat.ino ?? 0;
@@ -361,4 +340,3 @@ class VinylStat {
     isSocket() { return false; }
 }
 exports.VinylStat = VinylStat;
-//# sourceMappingURL=util.js.map

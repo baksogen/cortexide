@@ -3,55 +3,19 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getExtensionStream = getExtensionStream;
 exports.getBuiltInExtensions = getBuiltInExtensions;
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
-const os_1 = __importDefault(require("os"));
-const rimraf_1 = __importDefault(require("rimraf"));
-const event_stream_1 = __importDefault(require("event-stream"));
-const gulp_rename_1 = __importDefault(require("gulp-rename"));
-const vinyl_fs_1 = __importDefault(require("vinyl-fs"));
-const ext = __importStar(require("./extensions"));
-const fancy_log_1 = __importDefault(require("fancy-log"));
-const ansi_colors_1 = __importDefault(require("ansi-colors"));
+const fs_1 = require("fs");
+const path_1 = require("path");
+const os_1 = require("os");
+const rimraf_1 = require("rimraf");
+const event_stream_1 = require("event-stream");
+const gulp_rename_1 = require("gulp-rename");
+const vinyl_fs_1 = require("vinyl-fs");
+const ext = require("./extensions");
+const fancy_log_1 = require("fancy-log");
+const ansi_colors_1 = require("ansi-colors");
 const root = path_1.default.dirname(path_1.default.dirname(__dirname));
 const productjson = JSON.parse(fs_1.default.readFileSync(path_1.default.join(__dirname, '../../product.json'), 'utf8'));
 const builtInExtensions = productjson.builtInExtensions || [];
@@ -176,4 +140,3 @@ if (require.main === module) {
         process.exit(1);
     });
 }
-//# sourceMappingURL=builtInExtensions.js.map

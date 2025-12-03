@@ -7,8 +7,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
+const fs = require("fs");
+const path = require("path");
 const url_1 = __importDefault(require("url"));
 const ansi_colors_1 = __importDefault(require("ansi-colors"));
 const root = path.dirname(path.dirname(__dirname));

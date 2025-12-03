@@ -9,8 +9,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Mangler = void 0;
 const node_v8_1 = __importDefault(require("node:v8"));
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
+const fs = require("fs");
+const path = require("path");
 const process_1 = require("process");
 const source_map_1 = require("source-map");
 const typescript_1 = __importDefault(require("typescript"));

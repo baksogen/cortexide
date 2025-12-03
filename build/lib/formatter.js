@@ -8,8 +8,8 @@ exports.format = format;
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
+const fs = require("fs");
+const path = require("path");
 const typescript_1 = __importDefault(require("typescript"));
 class LanguageServiceHost {
     files = {};

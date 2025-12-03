@@ -7,9 +7,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const path_1 = __importDefault(require("path"));
+const path = require("path");
 const child_process_1 = __importDefault(require("child_process"));
-const fs_1 = __importDefault(require("fs"));
+const fs = require("fs");
 const vinyl_1 = __importDefault(require("vinyl"));
 const event_stream_1 = __importDefault(require("event-stream"));
 const gulp_filter_1 = __importDefault(require("gulp-filter"));

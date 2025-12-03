@@ -12,7 +12,7 @@ const lazy_js_1 = __importDefault(require("lazy.js"));
 const event_stream_1 = require("event-stream");
 const vinyl_1 = __importDefault(require("vinyl"));
 const source_map_1 = __importDefault(require("source-map"));
-const path_1 = __importDefault(require("path"));
+const path = require("path");
 const gulp_sort_1 = __importDefault(require("gulp-sort"));
 var CollectStepResult;
 (function (CollectStepResult) {

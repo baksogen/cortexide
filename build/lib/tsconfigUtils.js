@@ -18,7 +18,7 @@ function getTargetStringFromTsConfig(configFilePath) {
     if (parsed.error) {
         throw new Error(`Cannot determine target from ${configFilePath}. TS error: ${parsed.error.messageText}`);
     }
-    const cmdLine = typescript_1.default.parseJsonConfigFileContent(parsed.config, typescript_1.default.sys, (0, path_1.dirname)(configFilePath), {});
+    const cmdLine = typescript_1.default.parseJsonConfigFileContent(parsed.config, typescript_1.default.sys, (0, path.dirname)(configFilePath), {});
     const resolved = typeof cmdLine.options.target !== 'undefined' ? typescript_1.default.ScriptTarget[cmdLine.options.target] : undefined;
     if (!resolved) {
         throw new Error(`Could not resolve target in ${configFilePath}`);

@@ -8,11 +8,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createReporter = createReporter;
-const event_stream_1 = __importDefault(require("event-stream"));
+const event_stream_1 = require("event-stream");
 const fancy_log_1 = __importDefault(require("fancy-log"));
 const ansi_colors_1 = __importDefault(require("ansi-colors"));
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
+const fs = require("fs");
+const path = require("path");
 class ErrorLog {
     id;
     constructor(id) {

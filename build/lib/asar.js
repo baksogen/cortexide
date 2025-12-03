@@ -8,8 +8,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createAsar = createAsar;
-const path_1 = __importDefault(require("path"));
-const event_stream_1 = __importDefault(require("event-stream"));
+const path = require("path");
+const event_stream_1 = require("event-stream");
 const pickle = require('chromium-pickle-js');
 const Filesystem = require('asar/lib/filesystem');
 const vinyl_1 = __importDefault(require("vinyl"));

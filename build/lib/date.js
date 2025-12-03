@@ -9,8 +9,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.writeISODate = writeISODate;
 exports.readISODate = readISODate;
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
+const path = require("path");
+const fs = require("fs");
 const root = path.join(__dirname, '..', '..');
 /**
  * Writes a `outDir/date` file with the contents of the build

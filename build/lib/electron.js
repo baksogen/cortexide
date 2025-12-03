@@ -41,8 +41,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.config = void 0;
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
+const fs = require("fs");
+const path = require("path");
 const vinyl_fs_1 = __importDefault(require("vinyl-fs"));
 const gulp_filter_1 = __importDefault(require("gulp-filter"));
 const util = __importStar(require("./util"));

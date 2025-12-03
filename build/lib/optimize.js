@@ -42,11 +42,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bundleTask = bundleTask;
 exports.minifyTask = minifyTask;
-const event_stream_1 = __importDefault(require("event-stream"));
+const event_stream_1 = require("event-stream");
 const gulp_1 = __importDefault(require("gulp"));
 const gulp_filter_1 = __importDefault(require("gulp-filter"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
+const path = require("path");
+const fs = require("fs");
 const pump_1 = __importDefault(require("pump"));
 const vinyl_1 = __importDefault(require("vinyl"));
 const bundle = __importStar(require("./bundle"));

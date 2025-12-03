@@ -42,8 +42,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CancellationToken = void 0;
 exports.createTypeScriptBuilder = createTypeScriptBuilder;
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
+const fs = require("fs");
+const path = require("path");
 const crypto_1 = __importDefault(require("crypto"));
 const utils = __importStar(require("./utils"));
 const ansi_colors_1 = __importDefault(require("ansi-colors"));

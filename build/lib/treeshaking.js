@@ -9,8 +9,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.toStringShakeLevel = toStringShakeLevel;
 exports.shake = shake;
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
+const fs = require("fs");
+const path = require("path");
 const typeScriptLanguageServiceHost_1 = require("./typeScriptLanguageServiceHost");
 var ShakeLevel;
 (function (ShakeLevel) {

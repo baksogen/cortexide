@@ -120,7 +120,7 @@ function bundleESMTask(opts) {
                     });
                 },
             };
-            const task = esbuild_1.build({
+            const task = esbuild_1.default.build({
                 bundle: true,
                 packages: 'external', // "external all the things", see https://esbuild.github.io/api/#packages
                 platform: 'neutral', // makes esm
@@ -192,8 +192,8 @@ function minifyTask(src, sourceMapBaseUrl) {
         const svgmin = require('gulp-svgmin');
         const esbuildFilter = (0, gulp_filter_1)('**/*.{js,css}', { restore: true });
         const svgFilter = (0, gulp_filter_1)('**/*.svg', { restore: true });
-        (0, pump_1)(gulp_1.default.src([src + '/**', '!' + src + '/**/*.map']), esbuildFilter, gulp_sourcemaps_1.default.init({ loadMaps: true }), event_stream_1.map((f, cb) => {
-            esbuild_1.build({
+        (0, pump_1.default)(gulp_1.default.src([src + '/**', '!' + src + '/**/*.map']), esbuildFilter, gulp_sourcemaps_1.default.init({ loadMaps: true }), event_stream_1.map((f, cb) => {
+            esbuild_1.default.build({
                 entryPoints: [f.path],
                 minify: true,
                 sourcemap: 'external',

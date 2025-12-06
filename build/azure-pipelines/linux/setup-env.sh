@@ -9,18 +9,25 @@ fi
 
 export VSCODE_CLIENT_SYSROOT_DIR=$PWD/.build/sysroots/glibc-2.28-gcc-10.5.0
 export VSCODE_REMOTE_SYSROOT_DIR=$PWD/.build/sysroots/glibc-2.28-gcc-8.5.0
-if [ -d "$VSCODE_CLIENT_SYSROOT_DIR" ]; then
-  echo "Using cached client sysroot"
-else
-  echo "Downloading client sysroot"
-  SYSROOT_ARCH="$SYSROOT_ARCH" VSCODE_SYSROOT_DIR="$VSCODE_CLIENT_SYSROOT_DIR" node -e '(async () => { const { getVSCodeSysroot } = require("./build/linux/debian/install-sysroot.js"); await getVSCodeSysroot(process.env["SYSROOT_ARCH"]); })()'
-fi
 
-if [ -d "$VSCODE_REMOTE_SYSROOT_DIR" ]; then
-  echo "Using cached remote sysroot"
+# Check if we should skip sysroot download
+# This is needed for alternative architectures where sysroot is not available
+if [ "$1" != "--skip-sysroot" ] && [ "$VSCODE_SKIP_SYSROOT" != "1" ]; then
+  if [ -d "$VSCODE_CLIENT_SYSROOT_DIR" ]; then
+    echo "Using cached client sysroot"
+  else
+    echo "Downloading client sysroot"
+    SYSROOT_ARCH="$SYSROOT_ARCH" VSCODE_SYSROOT_DIR="$VSCODE_CLIENT_SYSROOT_DIR" node -e '(async () => { const { getVSCodeSysroot } = require("./build/linux/debian/install-sysroot.js"); await getVSCodeSysroot(process.env["SYSROOT_ARCH"]); })()'
+  fi
+
+  if [ -d "$VSCODE_REMOTE_SYSROOT_DIR" ]; then
+    echo "Using cached remote sysroot"
+  else
+    echo "Downloading remote sysroot"
+    SYSROOT_ARCH="$SYSROOT_ARCH" VSCODE_SYSROOT_DIR="$VSCODE_REMOTE_SYSROOT_DIR" VSCODE_SYSROOT_PREFIX="-glibc-2.28-gcc-8.5.0" node -e '(async () => { const { getVSCodeSysroot } = require("./build/linux/debian/install-sysroot.js"); await getVSCodeSysroot(process.env["SYSROOT_ARCH"]); })()'
+  fi
 else
-  echo "Downloading remote sysroot"
-  SYSROOT_ARCH="$SYSROOT_ARCH" VSCODE_SYSROOT_DIR="$VSCODE_REMOTE_SYSROOT_DIR" VSCODE_SYSROOT_PREFIX="-glibc-2.28-gcc-8.5.0" node -e '(async () => { const { getVSCodeSysroot } = require("./build/linux/debian/install-sysroot.js"); await getVSCodeSysroot(process.env["SYSROOT_ARCH"]); })()'
+  echo "Skipping sysroot download (VSCODE_SKIP_SYSROOT=1 or --skip-sysroot flag)"
 fi
 
 if [ "$npm_config_arch" == "x64" ]; then

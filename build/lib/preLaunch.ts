@@ -5,9 +5,9 @@
 
 // @ts-check
 
-import path from 'path';
+import * as path from 'path';
 import { spawn } from 'child_process';
-import { promises as fs } from 'fs';
+import * as fs from 'fs';
 
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const rootDir = path.resolve(__dirname, '..', '..');
@@ -22,7 +22,7 @@ function runProcess(command: string, args: ReadonlyArray<string> = []) {
 
 async function exists(subdir: string) {
 	try {
-		await fs.stat(path.join(rootDir, subdir));
+		await fs.promises.stat(path.join(rootDir, subdir));
 		return true;
 	} catch {
 		return false;

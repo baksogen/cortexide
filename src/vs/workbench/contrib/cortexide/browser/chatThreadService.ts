@@ -14,7 +14,7 @@ import { ILLMMessageService } from '../common/sendLLMMessageService.js';
 import { chat_userMessageContent, isABuiltinToolName } from '../common/prompt/prompts.js';
 import { AnthropicReasoning, getErrorMessage, RawToolCallObj, RawToolParamsObj } from '../common/sendLLMMessageTypes.js';
 import { generateUuid } from '../../../../base/common/uuid.js';
-import { FeatureName, ModelSelection, ModelSelectionOptions, ProviderName } from '../common/cortexideSettingsTypes.js';
+import { ChatMode, FeatureName, ModelSelection, ModelSelectionOptions, ProviderName } from '../common/cortexideSettingsTypes.js';
 import { ICortexideSettingsService } from '../common/cortexideSettingsService.js';
 import { approvalTypeOfBuiltinToolName, BuiltinToolCallParams, BuiltinToolResultType, ToolCallParams, ToolName, ToolResult } from '../common/toolsServiceTypes.js';
 import { IToolsService } from './toolsService.js';
@@ -362,6 +362,19 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 	private readonly _pendingStreamStateUpdates = new Map<string, ThreadStreamState[string]>()
 	private _streamStateRafId: number | undefined
 
+	// PERFORMANCE: Cache prepared LLM messages to avoid expensive re-preparation when messages haven't changed
+	// Key: hash of (chatMessages content + modelSelection + chatMode + repoIndexer results)
+	// Value: { messages, separateSystemMessage, tokenCount, contextSize, timestamp }
+	private readonly _messagePrepCache: Map<string, {
+		messages: any[];
+		separateSystemMessage: string | undefined;
+		tokenCount: number;
+		contextSize: number;
+		timestamp: number;
+	}> = new Map();
+	private static readonly MESSAGE_PREP_CACHE_TTL = 5000; // 5 seconds - messages can change during agent loops
+	private static readonly MESSAGE_PREP_CACHE_MAX_SIZE = 50; // Limit cache size
+
 
 
 	constructor(
@@ -661,8 +674,8 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		const isCodebaseQuestion = matchesPattern || (hasCodebaseIndicator && startsWithQuestion)
 
 		const requiresComplexReasoning = isCodebaseQuestion || // Codebase questions need reasoning
-		                                 reasoningKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		                                 complexAnalysisKeywords.some(keyword => lowerMessage.includes(keyword))
+			reasoningKeywords.some(keyword => lowerMessage.includes(keyword)) ||
+			complexAnalysisKeywords.some(keyword => lowerMessage.includes(keyword))
 		const isLongMessage = userMessage.length > 500
 
 		// Privacy/offline mode: removed restriction for images/PDFs
@@ -702,13 +715,13 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		// Enable low-latency preference for simple questions to improve TTFS
 		// More aggressive: enable for simple questions OR when task doesn't require complex reasoning
 		const preferLowLatency = (isSimpleQuestion ||
-		                         (!requiresComplexReasoning &&
-		                          !hasImages &&
-		                          !hasPDFs &&
-		                          !isLongMessage &&
-		                          !isMultiStepTask &&
-		                          !isCodebaseQuestion &&
-		                          taskType === 'chat')) // Only for general chat, not code/vision tasks
+			(!requiresComplexReasoning &&
+				!hasImages &&
+				!hasPDFs &&
+				!isLongMessage &&
+				!isMultiStepTask &&
+				!isCodebaseQuestion &&
+				taskType === 'chat')) // Only for general chat, not code/vision tasks
 
 		const context: TaskContext = {
 			taskType,
@@ -991,8 +1004,8 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return debuggingKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       errorPatterns.some(pattern => pattern.test(lowerMessage)) ||
-		       (hasCode && (lowerMessage.includes('error') || lowerMessage.includes('exception')))
+			errorPatterns.some(pattern => pattern.test(lowerMessage)) ||
+			(hasCode && (lowerMessage.includes('error') || lowerMessage.includes('exception')))
 	}
 
 	/**
@@ -1012,7 +1025,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return reviewKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       reviewPatterns.some(pattern => pattern.test(lowerMessage))
+			reviewPatterns.some(pattern => pattern.test(lowerMessage))
 	}
 
 	/**
@@ -1032,7 +1045,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return testingKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       testingPatterns.some(pattern => pattern.test(lowerMessage))
+			testingPatterns.some(pattern => pattern.test(lowerMessage))
 	}
 
 	/**
@@ -1052,7 +1065,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return docKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       docPatterns.some(pattern => pattern.test(lowerMessage))
+			docPatterns.some(pattern => pattern.test(lowerMessage))
 	}
 
 	/**
@@ -1072,7 +1085,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return perfKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       perfPatterns.some(pattern => pattern.test(lowerMessage))
+			perfPatterns.some(pattern => pattern.test(lowerMessage))
 	}
 
 	/**
@@ -1092,7 +1105,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return securityKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       securityPatterns.some(pattern => pattern.test(lowerMessage))
+			securityPatterns.some(pattern => pattern.test(lowerMessage))
 	}
 
 	/**
@@ -1102,15 +1115,15 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 	private _detectSimpleQuestion(message: string, lowerMessage: string): boolean {
 		// Exclude complex tasks first
 		if (lowerMessage.includes('codebase') ||
-		    lowerMessage.includes('repository') ||
-		    lowerMessage.includes('architecture') ||
-		    lowerMessage.includes('analyze') ||
-		    lowerMessage.includes('refactor') ||
-		    lowerMessage.includes('implement') ||
-		    lowerMessage.includes('debug') ||
-		    lowerMessage.includes('error') ||
-		    lowerMessage.includes('fix') ||
-		    lowerMessage.includes('review')) {
+			lowerMessage.includes('repository') ||
+			lowerMessage.includes('architecture') ||
+			lowerMessage.includes('analyze') ||
+			lowerMessage.includes('refactor') ||
+			lowerMessage.includes('implement') ||
+			lowerMessage.includes('debug') ||
+			lowerMessage.includes('error') ||
+			lowerMessage.includes('fix') ||
+			lowerMessage.includes('review')) {
 			return false
 		}
 
@@ -1160,7 +1173,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return mathKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       mathPatterns.some(pattern => pattern.test(lowerMessage))
+			mathPatterns.some(pattern => pattern.test(lowerMessage))
 	}
 
 	/**
@@ -1179,7 +1192,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		]
 
 		return multiLangKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-		       multiLangPatterns.some(pattern => pattern.test(lowerMessage))
+			multiLangPatterns.some(pattern => pattern.test(lowerMessage))
 	}
 
 	/**
@@ -1505,6 +1518,75 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		if (stepIdx < 0) return undefined
 
 		return { plan, planIdx, step: plan.steps[stepIdx], stepIdx }
+	}
+
+	/**
+	 * PERFORMANCE: Generate cache key for message preparation
+	 * Key is based on chatMessages content, modelSelection, chatMode, and repoIndexer results
+	 */
+	private _getMessagePrepCacheKey(
+		chatMessages: any[],
+		modelSelection: ModelSelection | null,
+		chatMode: ChatMode,
+		repoIndexerResults: { results: string[]; metrics: any } | null | undefined
+	): string {
+		// Create stable hash from inputs
+		const modelKey = modelSelection ? `${modelSelection.providerName}:${modelSelection.modelName}` : 'null';
+		const messagesHash = JSON.stringify(chatMessages.map(m => ({
+			role: m.role,
+			content: typeof m.content === 'string' ? m.content.substring(0, 100) : m.content, // Truncate for hash
+			id: m.id
+		})));
+		const repoIndexerKey = repoIndexerResults ? JSON.stringify(repoIndexerResults.results.slice(0, 10)) : 'null';
+		return `${modelKey}|${chatMode}|${messagesHash}|${repoIndexerKey}`;
+	}
+
+	/**
+	 * PERFORMANCE: Compute token count and context size from prepared messages (cached)
+	 */
+	private _computeTokenCount(messages: any[]): { tokenCount: number; contextSize: number } {
+		const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+		let tokenCount = 0;
+		let contextSize = 0;
+
+		for (const m of messages) {
+			// Handle Gemini messages (use 'parts' instead of 'content')
+			if ('parts' in m) {
+				for (const part of m.parts) {
+					if ('text' in part && typeof part.text === 'string') {
+						tokenCount += estimateTokens(part.text);
+						contextSize += part.text.length;
+					} else if ('inlineData' in part) {
+						// Rough estimate: ~85 tokens per image + base64 overhead
+						tokenCount += 100;
+					}
+				}
+			}
+			// Handle Anthropic/OpenAI messages (use 'content')
+			else if ('content' in m) {
+				if (typeof m.content === 'string') {
+					tokenCount += estimateTokens(m.content);
+					contextSize += m.content.length;
+				} else if (Array.isArray(m.content)) {
+					// Handle OpenAI format with image_url parts
+					for (const part of m.content) {
+						if (part.type === 'text') {
+							tokenCount += estimateTokens(part.text);
+							contextSize += part.text.length;
+						} else if (part.type === 'image_url') {
+							// Rough estimate: ~85 tokens per image + base64 overhead
+							tokenCount += 100;
+						}
+					}
+				} else {
+					const jsonStr = JSON.stringify(m.content);
+					tokenCount += estimateTokens(jsonStr);
+					contextSize += jsonStr.length;
+				}
+			}
+		}
+
+		return { tokenCount, contextSize };
 	}
 
 	private _updatePlanStep(threadId: string, planIdx: number, stepIdx: number, updates: Partial<PlanStep>) {
@@ -2091,9 +2173,9 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 	): void {
 		const fileName = editContext.uri.path.split('/').pop() || editContext.uri.path;
 		const operationLabel = toolName === 'rewrite_file' ? 'rewritten' :
-		                      toolName === 'edit_file' ? 'edited' :
-		                      toolName === 'create_file_or_folder' ? 'created' :
-		                      'modified';
+			toolName === 'edit_file' ? 'edited' :
+				toolName === 'create_file_or_folder' ? 'created' :
+					'modified';
 
 		// Show brief, non-intrusive notification
 		// Not sticky, auto-dismisses after a few seconds
@@ -2807,13 +2889,64 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 			}
 			chatLatencyAudit.markPromptAssemblyStart(finalRequestId)
 
-			// Use let so we can re-prepare messages when switching models in auto mode
-			let { messages, separateSystemMessage } = await this._convertToLLMMessagesService.prepareLLMChatMessages({
-				chatMessages: preprocessedMessages,
-				modelSelection,
-				chatMode,
-				repoIndexerPromise
-			})
+			// PERFORMANCE: Check cache for prepared messages before expensive preparation
+			// Get repoIndexer results if promise is available (for cache key)
+			let repoIndexerResults: { results: string[]; metrics: any } | null | undefined = undefined;
+			if (repoIndexerPromise) {
+				try {
+					repoIndexerResults = await repoIndexerPromise;
+				} catch {
+					// Ignore errors - will prepare without cache
+				}
+			}
+
+			const cacheKey = this._getMessagePrepCacheKey(preprocessedMessages, modelSelection, chatMode, repoIndexerResults);
+			const cached = this._messagePrepCache.get(cacheKey);
+			const now = Date.now();
+
+			let messages: any[];
+			let separateSystemMessage: string | undefined;
+			let promptTokens: number;
+			let contextSize: number;
+
+			// Use cached result if available and not expired
+			if (cached && (now - cached.timestamp) < ChatThreadService.MESSAGE_PREP_CACHE_TTL) {
+				messages = cached.messages;
+				separateSystemMessage = cached.separateSystemMessage;
+				promptTokens = cached.tokenCount;
+				contextSize = cached.contextSize;
+			} else {
+				// Prepare messages (expensive operation)
+				const prepResult = await this._convertToLLMMessagesService.prepareLLMChatMessages({
+					chatMessages: preprocessedMessages,
+					modelSelection,
+					chatMode,
+					repoIndexerPromise: repoIndexerResults ? Promise.resolve(repoIndexerResults) : repoIndexerPromise
+				});
+				messages = prepResult.messages;
+				separateSystemMessage = prepResult.separateSystemMessage;
+
+				// Compute token count and context size
+				const tokenResult = this._computeTokenCount(messages);
+				promptTokens = tokenResult.tokenCount;
+				contextSize = tokenResult.contextSize;
+
+				// Cache result (with LRU eviction)
+				if (this._messagePrepCache.size >= ChatThreadService.MESSAGE_PREP_CACHE_MAX_SIZE) {
+					// Remove oldest entry (simple FIFO eviction)
+					const firstKey = this._messagePrepCache.keys().next().value;
+					if (firstKey !== undefined) {
+						this._messagePrepCache.delete(firstKey);
+					}
+				}
+				this._messagePrepCache.set(cacheKey, {
+					messages,
+					separateSystemMessage,
+					tokenCount: promptTokens,
+					contextSize,
+					timestamp: now
+				});
+			}
 
 			// CRITICAL: Validate that messages are not empty before sending to API
 			// Empty messages cause "invalid message format" errors
@@ -2836,69 +2969,14 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 				return
 			}
 
-			// Track prompt assembly end and estimate tokens
-			const estimateTokens = (text: string) => Math.ceil(text.length / 4)
-			const promptTokens = messages.reduce((acc, m) => {
-				// Handle Gemini messages (use 'parts' instead of 'content')
-				if ('parts' in m) {
-					return acc + m.parts.reduce((sum: number, part) => {
-						if ('text' in part && typeof part.text === 'string') {
-							return sum + estimateTokens(part.text)
-						} else if ('inlineData' in part) {
-							// Rough estimate: ~85 tokens per image + base64 overhead
-							return sum + 100
-						}
-						return sum
-					}, 0)
-				}
-				// Handle Anthropic/OpenAI messages (use 'content')
-				if ('content' in m) {
-					if (typeof m.content === 'string') {
-						return acc + estimateTokens(m.content)
-					} else if (Array.isArray(m.content)) {
-						// Handle OpenAI format with image_url parts
-						return acc + m.content.reduce((sum: number, part: any) => {
-							if (part.type === 'text') {
-								return sum + estimateTokens(part.text)
-							} else if (part.type === 'image_url') {
-								// Rough estimate: ~85 tokens per image + base64 overhead
-								return sum + 100
-							}
-							return sum
-						}, 0)
-					}
-					return acc + estimateTokens(JSON.stringify(m.content))
-				}
-				return acc
-			}, 0)
-			const contextSize = messages.reduce((acc, m) => {
-				// Handle Gemini messages (use 'parts' instead of 'content')
-				if ('parts' in m) {
-					return acc + m.parts.reduce((sum: number, part) => {
-						if ('text' in part && typeof part.text === 'string') {
-							return sum + part.text.length
-						}
-						return sum
-					}, 0)
-				}
-				// Handle Anthropic/OpenAI messages (use 'content')
-				if ('content' in m) {
-					if (typeof m.content === 'string') {
-						return acc + m.content.length
-					} else if (Array.isArray(m.content)) {
-						return acc + m.content.reduce((sum: number, part: any) => {
-							if (part.type === 'text') return sum + part.text.length
-							return sum
-						}, 0)
-					}
-					return acc + JSON.stringify(m.content).length
-				}
-				return acc
-			}, 0)
+			// PERFORMANCE: Token count and context size already computed (from cache or preparation)
+			// No need to recompute - use cached values
 			chatLatencyAudit.markPromptAssemblyEnd(finalRequestId, promptTokens, 0, contextSize, false)
 
 			// Audit log: record prompt
-			if (this._auditLogService.isEnabled() && modelSelection) {
+			// PERFORMANCE: Cache isEnabled() check to avoid repeated calls
+			const auditEnabled = this._auditLogService.isEnabled();
+			if (auditEnabled && modelSelection) {
 				await this._auditLogService.append({
 					ts: Date.now(),
 					action: 'prompt',
@@ -2922,8 +3000,8 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 			let originalRoutingDecision: RoutingDecision | null = null
 			// Track if we're in auto mode (user selected "auto")
 			const isAutoMode = !modelSelection || (modelSelection.providerName === 'auto' && modelSelection.modelName === 'auto') ||
-			                    (this._settingsService.state.modelSelectionOfFeature['Chat']?.providerName === 'auto' &&
-			                     this._settingsService.state.modelSelectionOfFeature['Chat']?.modelName === 'auto')
+				(this._settingsService.state.modelSelectionOfFeature['Chat']?.providerName === 'auto' &&
+					this._settingsService.state.modelSelectionOfFeature['Chat']?.modelName === 'auto')
 
 			// If in auto mode and we have a model selection, try to get the routing decision for fallback chain
 			if (isAutoMode && modelSelection && modelSelection.providerName !== 'auto') {
@@ -2947,21 +3025,56 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 					if (previousModelKey !== null && previousModelKey !== modelKey) {
 						try {
 							console.log(`[ChatThreadService] Re-preparing messages for new model: ${modelKey}`)
-							const { messages: newMessages, separateSystemMessage: newSeparateSystemMessage } = await this._convertToLLMMessagesService.prepareLLMChatMessages({
-								chatMessages: preprocessedMessages,
-								modelSelection,
-								chatMode,
-								repoIndexerPromise
-							})
+							// PERFORMANCE: Use cache for model switch too
+							const switchCacheKey = this._getMessagePrepCacheKey(preprocessedMessages, modelSelection, chatMode, repoIndexerResults);
+							const switchCached = this._messagePrepCache.get(switchCacheKey);
+							const switchNow = Date.now();
+
+							if (switchCached && (switchNow - switchCached.timestamp) < ChatThreadService.MESSAGE_PREP_CACHE_TTL) {
+								// Use cached result
+								messages = switchCached.messages;
+								separateSystemMessage = switchCached.separateSystemMessage;
+								promptTokens = switchCached.tokenCount;
+								contextSize = switchCached.contextSize;
+							} else {
+								// Prepare messages (cache miss)
+								const prepResult = await this._convertToLLMMessagesService.prepareLLMChatMessages({
+									chatMessages: preprocessedMessages,
+									modelSelection,
+									chatMode,
+									repoIndexerPromise: repoIndexerResults ? Promise.resolve(repoIndexerResults) : repoIndexerPromise
+								});
+								messages = prepResult.messages;
+								separateSystemMessage = prepResult.separateSystemMessage;
+
+								// Compute token count
+								const tokenResult = this._computeTokenCount(messages);
+								promptTokens = tokenResult.tokenCount;
+								contextSize = tokenResult.contextSize;
+
+								// Cache result
+								if (this._messagePrepCache.size >= ChatThreadService.MESSAGE_PREP_CACHE_MAX_SIZE) {
+									const firstKey = this._messagePrepCache.keys().next().value;
+									if (firstKey !== undefined) {
+										this._messagePrepCache.delete(firstKey);
+									}
+								}
+								this._messagePrepCache.set(switchCacheKey, {
+									messages,
+									separateSystemMessage,
+									tokenCount: promptTokens,
+									contextSize,
+									timestamp: switchNow
+								});
+							}
+
 							// Only update if we got valid messages
-							if (newMessages && newMessages.length > 0) {
-								messages = newMessages
-								separateSystemMessage = newSeparateSystemMessage
+							if (messages && messages.length > 0) {
 								// Update finalRequestId context with new prompt tokens
 								const promptTokens = messages.reduce((acc, m) => {
 									// Handle Gemini messages (use 'parts' instead of 'content')
 									if ('parts' in m) {
-										return acc + m.parts.reduce((sum: number, part) => {
+										return acc + m.parts.reduce((sum: number, part: { text?: string; inlineData?: { mimeType: string; data: string } }) => {
 											if ('text' in part && typeof part.text === 'string') {
 												return sum + Math.ceil(part.text.length / 4)
 											} else if ('inlineData' in part) {
@@ -3101,13 +3214,15 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 						const outputTokens = textToCount.length > 0 ? Math.max(1, Math.ceil(textToCount.length / 3.5)) : 0
 						chatLatencyAudit.markStreamComplete(finalRequestId, outputTokens)
 						// Log metrics for debugging
-						const metrics = chatLatencyAudit.completeRequest(finalRequestId)
+						// PERFORMANCE: Only compute metrics if audit is enabled (metrics computation has overhead)
+						const metrics = auditEnabled ? chatLatencyAudit.completeRequest(finalRequestId) : null
 						if (metrics) {
 							chatLatencyAudit.logMetrics(metrics)
 						}
 
 						// Audit log: record reply
-						if (this._auditLogService.isEnabled() && modelSelection) {
+						// PERFORMANCE: Reuse cached auditEnabled check from earlier in function
+						if (auditEnabled && modelSelection) {
 							await this._auditLogService.append({
 								ts: Date.now(),
 								action: 'reply',
@@ -3134,7 +3249,8 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 						chatLatencyAudit.markStreamComplete(finalRequestId, 0)
 
 						// Audit log: record error
-						if (this._auditLogService.isEnabled() && modelSelection) {
+						// PERFORMANCE: Reuse cached auditEnabled check from earlier in function
+						if (auditEnabled && modelSelection) {
 							await this._auditLogService.append({
 								ts: Date.now(),
 								action: 'reply',
@@ -3572,7 +3688,7 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 
 							// Make one final LLM call to generate the answer based on what we've read
 							// Set state to 'LLM' to show we're generating the final answer
-							this._setStreamState(threadId, { isRunning: 'LLM', llmInfo: { displayContentSoFar: 'Generating final answer based on files read...', reasoningSoFar: '', toolCallSoFar: null }, interrupt: Promise.resolve(() => {}) })
+							this._setStreamState(threadId, { isRunning: 'LLM', llmInfo: { displayContentSoFar: 'Generating final answer based on files read...', reasoningSoFar: '', toolCallSoFar: null }, interrupt: Promise.resolve(() => { }) })
 
 							// Force shouldSendAnotherMessage to true to make one more LLM call
 							// This will generate the final answer before returning

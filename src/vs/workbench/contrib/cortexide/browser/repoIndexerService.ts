@@ -89,6 +89,10 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 	private static readonly QUERY_CACHE_SIZE = 200; // Cache last 200 queries (increased from 50)
 	private static readonly QUERY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+	// Query embedding cache (reuse embeddings for identical queries to avoid recomputation)
+	private _queryEmbeddingCache: LRUCache<string, { embedding: number[]; timestamp: number }> = new LRUCache(50);
+	private static readonly QUERY_EMBEDDING_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes (longer than query cache since embeddings are expensive)
+
 	// Tokenization cache to avoid re-tokenizing same strings
 	private _tokenizationCache: LRUCache<string, Set<string>> = new LRUCache(10000); // Increased from 1000 to 10000
 
@@ -186,7 +190,10 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 		});
 
 		this.privacyGate = new OfflinePrivacyGate();
-		this._loadIndex();
+		// PERFORMANCE: Defer index loading until first use (lazy initialization)
+		// This prevents blocking startup with synchronous file I/O
+		// Index will be loaded on first query() or warmIndex() call
+		// this._loadIndex(); // Removed - now lazy loaded
 
 		// Setup incremental update scheduler
 		this._incrementalUpdateScheduler = this._register(new RunOnceScheduler(
@@ -254,30 +261,45 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 			const content = await this.fileService.readFile(indexPath);
 			const data = JSON.parse(content.value.toString());
 			if (Array.isArray(data)) {
-				// Validate and deserialize index entries (convert arrays back to Sets)
-				this._index = data.filter((entry: any) =>
+				// PERFORMANCE: Process entries in chunks to avoid blocking UI for large indexes
+				// Chunk size: 1000 entries per chunk (yield to UI thread between chunks)
+				const CHUNK_SIZE = 1000;
+				const filteredData = data.filter((entry: any) =>
 					entry &&
 					typeof entry.uri === 'string' &&
 					Array.isArray(entry.symbols) &&
 					typeof entry.snippet === 'string'
-				).map((entry: any) => ({
-					...entry,
-					// Convert arrays back to Sets for fast lookups
-					snippetTokens: entry.snippetTokens ? new Set(entry.snippetTokens) : undefined,
-					uriTokens: entry.uriTokens ? new Set(entry.uriTokens) : undefined,
-					symbolTokens: entry.symbolTokens ? new Set(entry.symbolTokens) : undefined,
-					chunks: entry.chunks?.map((chunk: any) => ({
-						...chunk,
-						tokens: chunk.tokens ? new Set(chunk.tokens) : undefined,
-						embedding: chunk.embedding && Array.isArray(chunk.embedding) ? chunk.embedding : undefined
-					})),
-					// Embeddings are already arrays, no conversion needed
-					snippetEmbedding: entry.snippetEmbedding && Array.isArray(entry.snippetEmbedding) ? entry.snippetEmbedding : undefined,
-					chunkEmbeddings: entry.chunkEmbeddings && Array.isArray(entry.chunkEmbeddings) ? entry.chunkEmbeddings : undefined,
-					// Import information is already arrays, no conversion needed
-					importedSymbols: entry.importedSymbols,
-					importedFrom: entry.importedFrom
-				}));
+				);
+
+				this._index = [];
+				for (let i = 0; i < filteredData.length; i += CHUNK_SIZE) {
+					const chunk = filteredData.slice(i, i + CHUNK_SIZE);
+					const processedChunk = chunk.map((entry: any) => ({
+						...entry,
+						// Convert arrays back to Sets for fast lookups
+						snippetTokens: entry.snippetTokens ? new Set(entry.snippetTokens) : undefined,
+						uriTokens: entry.uriTokens ? new Set(entry.uriTokens) : undefined,
+						symbolTokens: entry.symbolTokens ? new Set(entry.symbolTokens) : undefined,
+						chunks: entry.chunks?.map((chunk: any) => ({
+							...chunk,
+							tokens: chunk.tokens ? new Set(chunk.tokens) : undefined,
+							embedding: chunk.embedding && Array.isArray(chunk.embedding) ? chunk.embedding : undefined
+						})),
+						// Embeddings are already arrays, no conversion needed
+						snippetEmbedding: entry.snippetEmbedding && Array.isArray(entry.snippetEmbedding) ? entry.snippetEmbedding : undefined,
+						chunkEmbeddings: entry.chunkEmbeddings && Array.isArray(entry.chunkEmbeddings) ? entry.chunkEmbeddings : undefined,
+						// Import information is already arrays, no conversion needed
+						importedSymbols: entry.importedSymbols,
+						importedFrom: entry.importedFrom
+					}));
+					this._index.push(...processedChunk);
+
+					// Yield to UI thread between chunks for large indexes
+					if (i + CHUNK_SIZE < filteredData.length) {
+						await new Promise(resolve => setTimeout(resolve, 0));
+					}
+				}
+
 				// Rebuild inverted indexes from loaded data (tokens already pre-computed!)
 				this._rebuildInvertedIndexes();
 				this._isWarmed = true;
@@ -402,7 +424,7 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 		}
 	}
 
-	private async _walkFiles(workspaceRoot: URI, onFile: (uri: URI) => Promise<void>): Promise<void> {
+	private async _walkFiles(workspaceRoot: URI, onFile: (uri: URI) => Promise<void>, token: CancellationToken = CancellationToken.None): Promise<void> {
 		const ignorePatterns = [
 			'node_modules', '.git', 'dist', 'build', 'out',
 			'.vscode', '.idea', 'coverage', '.nyc_output', '.next', '.cache'
@@ -412,12 +434,36 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 			return ignorePatterns.some(pattern => path.includes(pattern));
 		};
 
+		// PERFORMANCE: Track directory count for cooperative yielding
+		let directoryCount = 0;
+		const YIELD_INTERVAL = 50; // Yield every 50 directories to maintain UI responsiveness
+
 		const walk = async (dir: URI): Promise<void> => {
+			// Check cancellation token
+			if (token.isCancellationRequested) {
+				return;
+			}
+
 			try {
 				const entries = await this.fileService.resolve(dir);
 				if (!entries.children) return;
 
+				// PERFORMANCE: Yield to event loop periodically to avoid blocking UI
+				directoryCount++;
+				if (directoryCount % YIELD_INTERVAL === 0) {
+					await new Promise(resolve => setTimeout(resolve, 0));
+					// Check cancellation again after yielding
+					if (token.isCancellationRequested) {
+						return;
+					}
+				}
+
 				for (const child of entries.children) {
+					// Check cancellation before processing each child
+					if (token.isCancellationRequested) {
+						return;
+					}
+
 					if (shouldIgnore(child.resource.path)) continue;
 
 					if (child.isDirectory) {
@@ -731,7 +777,7 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 		}
 	}
 
-	async rebuildIndex(): Promise<void> {
+	async rebuildIndex(token: CancellationToken = CancellationToken.None): Promise<void> {
 		const workspace = this.workspaceContextService.getWorkspace().folders[0]?.uri;
 		if (!workspace) {
 			this.notificationService.warn('No workspace open. Cannot rebuild index.');
@@ -758,21 +804,41 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 		this._bm25StatsCache.clear(); // Clear BM25 stats cache
 		this._avgDocLengthDirty = true; // Mark average doc length as dirty
 
-		// Collect all files first
+		// Collect all files first (with cancellation support)
 		const filesToIndex: URI[] = [];
 		await this._walkFiles(workspace, async (uri) => {
+			if (token.isCancellationRequested) {
+				return;
+			}
 			filesToIndex.push(uri);
-		});
+		}, token);
+
+		// Check cancellation after file walking
+		if (token.isCancellationRequested) {
+			this.notificationService.info('Index rebuild cancelled.');
+			return;
+		}
 
 		// Process files in parallel batches for better performance
 		let fileCount = 0;
 		let failedCount = 0;
 
 		for (let i = 0; i < filesToIndex.length; i += RepoIndexerService.BATCH_SIZE) {
+			// Check cancellation before processing each batch
+			if (token.isCancellationRequested) {
+				this.notificationService.info(`Index rebuild cancelled. Indexed ${fileCount} files so far.`);
+				return;
+			}
+
 			const batch = filesToIndex.slice(i, i + RepoIndexerService.BATCH_SIZE);
 
 			const results = await Promise.allSettled(
 				batch.map(async (uri) => {
+					// Check cancellation before processing each file
+					if (token.isCancellationRequested) {
+						throw new Error('Cancelled');
+					}
+
 					try {
 						// Extract symbols (will only work for files with loaded models)
 						const symbols = await this._extractSymbols(uri);
@@ -813,7 +879,8 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 				}
 			}
 
-			// Yield to event loop periodically to avoid blocking
+			// PERFORMANCE: Yield to event loop periodically to avoid blocking UI
+			// This maintains responsiveness during long indexing operations
 			if (i + RepoIndexerService.BATCH_SIZE < filesToIndex.length) {
 				await new Promise(resolve => setTimeout(resolve, 0));
 			}
@@ -866,6 +933,11 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 	}
 
 	async queryWithMetrics(text: string, k: number = 5): Promise<{ results: string[]; metrics: QueryMetrics }> {
+		// PERFORMANCE: Lazy load index on first query if not already loaded
+		if (!this._isWarmed && this._index.length === 0) {
+			await this._loadIndex();
+		}
+
 		const startTime = performance.now();
 		let embeddingLatencyMs = 0;
 		let queryEmbedding: number[] | undefined;
@@ -880,14 +952,29 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 		}
 
 		// Compute query embedding if available (for hybrid search)
+		// PERFORMANCE: Reuse cached embeddings for identical queries (expensive operation)
 		if (this._canComputeEmbeddings()) {
 			try {
-				const embeddingStartTime = performance.now();
-				const embeddings = await this._computeEmbeddings([text], CancellationToken.None);
-				embeddingLatencyMs = performance.now() - embeddingStartTime;
-				// _computeEmbeddings always returns number[][], so take first element
-				if (embeddings.length > 0 && embeddings[0] && embeddings[0].length > 0) {
-					queryEmbedding = embeddings[0];
+				// Check embedding cache first (normalize query for cache key)
+				const embeddingCacheKey = text.toLowerCase().trim();
+				const cachedEmbedding = this._queryEmbeddingCache.get(embeddingCacheKey);
+				if (cachedEmbedding && (performance.now() - cachedEmbedding.timestamp) < RepoIndexerService.QUERY_EMBEDDING_CACHE_TTL_MS) {
+					queryEmbedding = cachedEmbedding.embedding;
+					embeddingLatencyMs = 0; // Cache hit - no latency
+				} else {
+					// Cache miss - compute embedding
+					const embeddingStartTime = performance.now();
+					const embeddings = await this._computeEmbeddings([text], CancellationToken.None);
+					embeddingLatencyMs = performance.now() - embeddingStartTime;
+					// _computeEmbeddings always returns number[][], so take first element
+					if (embeddings.length > 0 && embeddings[0] && embeddings[0].length > 0) {
+						queryEmbedding = embeddings[0];
+						// Cache the embedding for future queries
+						this._queryEmbeddingCache.set(embeddingCacheKey, {
+							embedding: queryEmbedding,
+							timestamp: performance.now()
+						});
+					}
 				}
 			} catch (error) {
 				// Embedding computation failed, continue with BM25-only
@@ -925,7 +1012,7 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 		// If index is empty, try to warm it first (non-blocking)
 		if (this._index.length === 0 && !this._isWarmed) {
 			// Trigger background warmup without waiting
-			this.warmIndex(undefined).catch(() => {});
+			this.warmIndex(undefined).catch(() => { });
 		}
 
 		// First, try the on-disk index
@@ -1457,6 +1544,7 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 	/**
 	 * Hybrid reranking: combines BM25 and vector similarity scores
 	 * Uses weighted blend (configurable weights, defaults: 0.6 BM25, 0.4 vector)
+	 * PERFORMANCE: Only computes vector similarity for top BM25 candidates to avoid expensive cosine similarity calculations
 	 */
 	private _rerankHybrid(
 		query: string,
@@ -1472,8 +1560,10 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 			return this._rerankBM25Fast(query, qTokens, items, k);
 		}
 
-		// First apply BM25 reranking
-		const bm25Reranked = this._rerankBM25Fast(query, qTokens, items, k * 2); // Get more candidates for hybrid scoring
+		// PERFORMANCE: First filter to top BM25 candidates (items already have BM25 scores from initial scoring)
+		// Only compute expensive vector similarities for top candidates, not all items
+		const topBM25Count = Math.min(k * 1.5, items.length); // Get top 1.5k candidates for hybrid scoring
+		const bm25Reranked = this._partialSort(items, topBM25Count);
 
 		// Hybrid weights (tuned for code retrieval: BM25 for exact matches, vector for semantic similarity)
 		const BM25_WEIGHT = 0.6;
@@ -1484,14 +1574,14 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 		const maxBm25 = Math.max(...bm25Scores, 1); // Avoid division by zero
 		const minBm25 = Math.min(...bm25Scores, 0);
 
-		// Compute hybrid scores
+		// PERFORMANCE: Compute hybrid scores - vector similarity only computed for top BM25 candidates
 		const hybridScored = bm25Reranked.map((item) => {
 			// Normalize BM25 score to 0-1
 			const normalizedBm25 = maxBm25 > minBm25
 				? (item.score - minBm25) / (maxBm25 - minBm25)
 				: 0.5; // Default to middle if all scores are same
 
-			// Compute vector similarity (already 0-1 from cosine similarity)
+			// Compute vector similarity (expensive operation - only done for top candidates)
 			const vectorScore = this._computeVectorSimilarity(queryEmbedding, item.entry, item.chunk);
 
 			// Weighted blend
@@ -1506,6 +1596,7 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 
 	/**
 	 * Hybrid reranking using vector store results (BM25 + vector store scores)
+	 * PERFORMANCE: Only processes top BM25 candidates to avoid unnecessary work
 	 */
 	private _rerankHybridWithVectorStore(
 		query: string,
@@ -1516,14 +1607,16 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 	): typeof items {
 		if (items.length === 0) return items;
 
-		// Create a map of vector store scores by document ID
+		// Create a map of vector store scores by document ID (O(1) lookups)
 		const vectorScoreMap = new Map<string, number>();
 		for (const vr of vectorResults) {
 			vectorScoreMap.set(vr.id, vr.score);
 		}
 
-		// First apply BM25 reranking
-		const bm25Reranked = this._rerankBM25Fast(query, qTokens, items, k * 2);
+		// PERFORMANCE: Filter to top BM25 candidates first (items already have BM25 scores)
+		// Only compute hybrid scores for top candidates, not all items
+		const topBM25Count = Math.min(k * 1.5, items.length); // Get top 1.5k candidates for hybrid scoring
+		const bm25Reranked = this._partialSort(items, topBM25Count);
 
 		// Hybrid weights (tuned for code retrieval: BM25 for exact matches, vector for semantic similarity)
 		const BM25_WEIGHT = 0.6;
@@ -1835,7 +1928,8 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 					const { importedSymbols, importedFrom } = this._extractImports(fileContent);
 
 					// Update or add index entry
-					const existingIndex = this._index.findIndex(entry => entry.uri === uriPath);
+					// PERFORMANCE: Use O(1) path index lookup instead of O(n) findIndex
+					const existingIndex = this._pathIndex.get(uriPath.toLowerCase());
 					const newEntry: IndexEntry = {
 						uri: uriPath,
 						symbols,
@@ -1849,7 +1943,7 @@ class RepoIndexerService extends Disposable implements IRepoIndexerService {
 						importedFrom: importedFrom.length > 0 ? importedFrom : undefined
 					};
 
-					if (existingIndex >= 0) {
+					if (existingIndex !== undefined) {
 						// Remove old entry from inverted indexes
 						this._removeFromInvertedIndexes(existingIndex);
 						this._index[existingIndex] = newEntry;

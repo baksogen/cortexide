@@ -43,8 +43,8 @@ import './terminalToolService.js'
 // register Thread History
 import './chatThreadService.js'
 
-// ping
-import './metricsPollService.js'
+// ping - lazy load after startup
+import('./metricsPollService.js').catch(() => { });
 
 // helper services
 import './helperServices/consistentItemService.js'
@@ -55,8 +55,8 @@ import './cortexideSelectionHelperWidget.js'
 // register tooltip service
 import './tooltipService.js'
 
-// register onboarding service
-import './cortexideOnboardingService.js'
+// register onboarding service - lazy load (only needed on first run)
+import('./cortexideOnboardingService.js').catch(() => { });
 
 // register misc service
 import './miscWokrbenchContrib.js'
@@ -93,11 +93,11 @@ import '../common/codeReviewService.js'
 import './codeReviewEditorContribution.js'
 import './codeReviewCommands.js'
 
-// codebase query
-import './codebaseQueryCommands.js'
+// codebase query - lazy load (only needed when user invokes codebase query command)
+import('./codebaseQueryCommands.js').catch(() => { });
 
-// NL shell parser
-import '../common/nlShellParserService.js'
+// NL shell parser - lazy load (only needed when NL shell parsing is used)
+import('../common/nlShellParserService.js').catch(() => { });
 
 // error detection
 import '../common/errorDetectionService.js'
@@ -110,9 +110,9 @@ import '../common/performanceGuardrailsService.js'
 // status bar contribution
 import './cortexideStatusBar.js'
 
-// first-run validation
-import './firstRunValidation.js'
-import '../common/secretDetectionConfiguration.js'
+// first-run validation - lazy load (only needed on first run)
+import('./firstRunValidation.js').catch(() => { });
+import('../common/secretDetectionConfiguration.js').catch(() => { });
 
 // refreshModel
 import '../common/refreshModelService.js'
@@ -129,12 +129,13 @@ import '../common/cortexideModelService.js'
 // model warm-up service
 import '../common/modelWarmupService.js'
 
-// ollama installer service (main-process proxy)
-import '../common/ollamaInstallerService.js'
+// ollama installer service (main-process proxy) - lazy load (only needed when Ollama is accessed)
+import('../common/ollamaInstallerService.js').catch(() => { });
 
 // repo indexer
 import './repoIndexerService.js'
-import './repoIndexerActions.js'
+// repo indexer actions - lazy load (only needed when user invokes indexer actions)
+import('./repoIndexerActions.js').catch(() => { });
 
 // Image QA Registry initialization
 import './imageQARegistryContribution.js'

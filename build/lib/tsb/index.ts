@@ -10,7 +10,7 @@ import ts from 'typescript';
 import { Readable, Writable, Duplex } from 'stream';
 import { dirname } from 'path';
 import { strings } from './utils';
-import { readFileSync, statSync } from 'fs';
+import * as fs from 'fs';
 import log from 'fancy-log';
 import { ESBuildTranspiler, ITranspiler, TscTranspiler } from './transpiler';
 import colors = require('ansi-colors');
@@ -151,8 +151,8 @@ export function create(
 					path = _fileNames[_pos];
 					more = this.push(new Vinyl({
 						path,
-						contents: readFileSync(path),
-						stat: statSync(path),
+						contents: fs.readFileSync(path),
+						stat: fs.statSync(path),
 						cwd: opts && opts.cwd,
 						base: opts && opts.base || dirname(projectPath)
 					}));

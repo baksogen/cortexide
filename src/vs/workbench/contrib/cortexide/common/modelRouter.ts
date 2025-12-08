@@ -149,12 +149,16 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 			};
 		}
 
+		// PERFORMANCE: Cache settings state lookup (accessed multiple times in this method)
+		// Pre-compute config to avoid repeated lookups
+		const settingsState = this.settingsService.state;
+		const perfSettings = settingsState.globalSettings.perf;
+		const localFirstAI = settingsState.globalSettings.localFirstAI ?? false;
+
 		// Fast path: Check cache for identical contexts
 		const cacheKey = this.getCacheKey(context);
 		const cached = this.routingCache.get(cacheKey);
 
-		// Get configurable cache TTL from settings (default 2000ms)
-		const perfSettings = this.settingsService.state.globalSettings.perf;
 		const cacheTTLForCheck = context.isSimpleQuestion
 			? this.ROUTING_CACHE_TTL_SIMPLE
 			: (perfSettings?.routerCacheTtlMs ?? this.ROUTING_CACHE_TTL_DEFAULT);
@@ -167,8 +171,6 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 			}
 			return cached.decision;
 		}
-
-		const settingsState = this.settingsService.state;
 
 		// Privacy/offline mode: only local models
 		// requiresPrivacy is set only when images/PDFs are present and imageQAAllowRemoteModels is false
@@ -190,7 +192,7 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 		}
 
 		// Local-First AI mode: heavily bias toward local models
-		const localFirstAI = settingsState.globalSettings.localFirstAI ?? false;
+		// PERFORMANCE: localFirstAI already cached above, reuse it
 		if (localFirstAI) {
 			// In Local-First mode, prefer local models but allow cloud as fallback
 			// This is handled in scoreModel by applying heavy bonuses to local models
@@ -223,8 +225,8 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 
 		// Debug: Log available models for codebase questions
 		const isCodebaseQuestionCheck = (context.requiresComplexReasoning && context.taskType === 'code' && !context.hasCode) ||
-		                                 (context.contextSize && context.contextSize > 15000) ||
-		                                 (context.taskType === 'code' && context.isLongMessage && !context.hasCode);
+			(context.contextSize && context.contextSize > 15000) ||
+			(context.taskType === 'code' && context.isLongMessage && !context.hasCode);
 		if (isCodebaseQuestionCheck) {
 			const onlineModels = availableModels.filter(m => {
 				if (m.providerName === 'auto') return false;
@@ -302,8 +304,8 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 		// For codebase questions: STRONGLY prefer online models - filter out local models if online models exist
 		// Detect codebase questions: complex reasoning + code task without code blocks, OR explicit context size requirement
 		const isCodebaseQuestionForFilter = (context.requiresComplexReasoning && context.taskType === 'code' && !context.hasCode) ||
-		                                    (context.contextSize && context.contextSize > 15000) ||
-		                                    (context.taskType === 'code' && context.isLongMessage && !context.hasCode);
+			(context.contextSize && context.contextSize > 15000) ||
+			(context.taskType === 'code' && context.isLongMessage && !context.hasCode);
 
 		if (isCodebaseQuestionForFilter && hasOnlineModels) {
 			// For codebase questions with online models available, ONLY consider online models
@@ -364,9 +366,9 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 
 		// Score and rank models using mixture policy (rules + learned)
 		// Only score candidate models to reduce overhead
-		// PERFORMANCE: Batch capability lookups to reduce overhead
+		// PERFORMANCE: Batch capability lookups to reduce overhead, pass pre-computed localFirstAI
 		const scored = candidateModels.map(model => {
-			const ruleScore = this.scoreModel(model, context, settingsState, hasOnlineModels);
+			const ruleScore = this.scoreModel(model, context, settingsState, hasOnlineModels, localFirstAI);
 			const learnedScore = this.getLearnedScore(model, context);
 			const finalScore = ruleScore * 0.7 + learnedScore * 0.3; // 70% rules, 30% learned
 			return {
@@ -481,8 +483,8 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 		// Debug: Warn if local model selected for codebase question when online models available
 		// Detect codebase questions: complex reasoning + code task without code blocks, OR explicit context size requirement
 		const isCodebaseQuestionForDebug = (context.requiresComplexReasoning && context.taskType === 'code' && !context.hasCode) ||
-		                                   (context.contextSize && context.contextSize > 15000) ||
-		                                   (context.taskType === 'code' && context.isLongMessage && !context.hasCode);
+			(context.contextSize && context.contextSize > 15000) ||
+			(context.taskType === 'code' && context.isLongMessage && !context.hasCode);
 
 		if (isCodebaseQuestionForDebug) {
 			const isLocal = (localProviderNames as readonly ProviderName[]).includes(finalModel.providerName as ProviderName);
@@ -598,9 +600,9 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 
 		// Complex tasks need escalation
 		if (context.requiresComplexReasoning ||
-		    context.isMultiStepTask ||
-		    (context.contextSize && context.contextSize > 100_000) ||
-		    context.isSecurityTask) {
+			context.isMultiStepTask ||
+			(context.contextSize && context.contextSize > 100_000) ||
+			context.isSecurityTask) {
 			return 'escalate';
 		}
 
@@ -763,7 +765,8 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 		modelSelection: ModelSelection,
 		context: TaskContext,
 		settingsState: any,
-		hasOnlineModels: boolean = false
+		hasOnlineModels: boolean = false,
+		localFirstAI?: boolean // PERFORMANCE: Pre-computed localFirstAI passed as parameter to avoid repeated lookup
 	): number {
 		// Skip "auto" - it's not a real model
 		if (modelSelection.providerName === 'auto' && modelSelection.modelName === 'auto') {
@@ -777,7 +780,8 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 		const isLocal = (localProviderNames as readonly ProviderName[]).includes(modelSelection.providerName as ProviderName);
 
 		// Check Local-First AI setting
-		const localFirstAI = settingsState.globalSettings.localFirstAI ?? false;
+		// PERFORMANCE: Use pre-computed value if provided, otherwise lookup (for backward compatibility)
+		const localFirstAICached = localFirstAI !== undefined ? localFirstAI : (settingsState.globalSettings.localFirstAI ?? false);
 
 		let score = 0; // Start from 0, build up based on quality and fit
 
@@ -808,7 +812,7 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 			score += 10;
 			// Boost local models that have useful capabilities (FIM, tools, reasoning)
 			if (capabilities.supportsFIM || capabilities.specialToolFormat ||
-			    (capabilities.reasoningCapabilities && typeof capabilities.reasoningCapabilities === 'object' && capabilities.reasoningCapabilities.supportsReasoning)) {
+				(capabilities.reasoningCapabilities && typeof capabilities.reasoningCapabilities === 'object' && capabilities.reasoningCapabilities.supportsReasoning)) {
 				score += 5; // Bonus for capable local models
 			}
 		}
@@ -862,10 +866,10 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 			if (isLocal) {
 				// Check if it's a slow local model
 				const isSlowLocalModel = name.includes('13b') ||
-				                         name.includes('70b') ||
-				                         name.includes('llama3') && !name.includes('8b') ||
-				                         name.includes('mistral') && !name.includes('7b') ||
-				                         name.includes('mixtral');
+					name.includes('70b') ||
+					name.includes('llama3') && !name.includes('8b') ||
+					name.includes('mistral') && !name.includes('7b') ||
+					name.includes('mixtral');
 
 				if (isSlowLocalModel) {
 					score -= 50; // Very strong penalty for slow local models on simple chat
@@ -906,8 +910,8 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 			// Codebase questions need large context and good reasoning - prioritize accordingly
 			// Detect codebase questions: complex reasoning + code task without code blocks, OR explicit context size requirement
 			const isCodebaseQuestion = (context.requiresComplexReasoning && context.taskType === 'code' && !context.hasCode) ||
-			                           (context.contextSize && context.contextSize > 15000) || // High context requirement suggests codebase question
-			                           (context.taskType === 'code' && context.isLongMessage && !context.hasCode);
+				(context.contextSize && context.contextSize > 15000) || // High context requirement suggests codebase question
+				(context.taskType === 'code' && context.isLongMessage && !context.hasCode);
 
 			if (isCodebaseQuestion) {
 				// Codebase questions: prioritize large context windows and reasoning
@@ -1143,21 +1147,21 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 				// Fast local models typically have "fast", "small", "tiny", "1b", "3b", "7b" in name
 				// Slow local models are usually larger: "13b", "70b", "llama3", "mistral", etc.
 				const isFastLocalModel = name.includes('fast') ||
-				                         name.includes('small') ||
-				                         name.includes('tiny') ||
-				                         name.includes('1b') ||
-				                         name.includes('3b') ||
-				                         name.includes('7b') && !name.includes('70b') ||
-				                         name.includes('qwen2.5-0.5b') ||
-				                         name.includes('qwen2.5-1.5b') ||
-				                         name.includes('phi-3-mini') ||
-				                         name.includes('gemma-2b');
+					name.includes('small') ||
+					name.includes('tiny') ||
+					name.includes('1b') ||
+					name.includes('3b') ||
+					name.includes('7b') && !name.includes('70b') ||
+					name.includes('qwen2.5-0.5b') ||
+					name.includes('qwen2.5-1.5b') ||
+					name.includes('phi-3-mini') ||
+					name.includes('gemma-2b');
 
 				const isSlowLocalModel = name.includes('13b') ||
-				                         name.includes('70b') ||
-				                         name.includes('llama3') && !name.includes('8b') ||
-				                         name.includes('mistral') && !name.includes('7b') ||
-				                         name.includes('mixtral');
+					name.includes('70b') ||
+					name.includes('llama3') && !name.includes('8b') ||
+					name.includes('mistral') && !name.includes('7b') ||
+					name.includes('mixtral');
 
 				if (isFastLocalModel) {
 					score += 25; // Bonus for fast local models
@@ -1186,7 +1190,8 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 		// ===== LOCAL-FIRST AI MODE =====
 		// When Local-First AI is enabled, heavily bias toward local models
 		// BUT: Reduce bias for heavy tasks that will be slow on local models
-		if (localFirstAI) {
+		// PERFORMANCE: Use pre-computed localFirstAICached instead of re-reading settings
+		if (localFirstAICached) {
 			// Estimate task size/complexity
 			const estimatedPromptTokens = context.contextSize ||
 				(context.isLongMessage ? 4000 : 1000) +
@@ -1204,7 +1209,7 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 					score += 30; // Reduced bonus for heavy tasks
 					// Extra bonus only for very capable local models on heavy tasks
 					if (capabilities.supportsFIM || capabilities.specialToolFormat ||
-					    (capabilities.reasoningCapabilities && typeof capabilities.reasoningCapabilities === 'object' && capabilities.reasoningCapabilities.supportsReasoning)) {
+						(capabilities.reasoningCapabilities && typeof capabilities.reasoningCapabilities === 'object' && capabilities.reasoningCapabilities.supportsReasoning)) {
 						score += 20; // Smaller extra bonus
 					}
 				} else {
@@ -1212,7 +1217,7 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 					score += 100; // Very strong bonus to prefer local models
 					// Extra bonus for capable local models
 					if (capabilities.supportsFIM || capabilities.specialToolFormat ||
-					    (capabilities.reasoningCapabilities && typeof capabilities.reasoningCapabilities === 'object' && capabilities.reasoningCapabilities.supportsReasoning)) {
+						(capabilities.reasoningCapabilities && typeof capabilities.reasoningCapabilities === 'object' && capabilities.reasoningCapabilities.supportsReasoning)) {
 						score += 50; // Extra bonus for capable local models
 					}
 				}
@@ -1459,8 +1464,10 @@ export class TaskAwareModelRouter extends Disposable implements ITaskAwareModelR
 
 		// Score local models using mixture policy
 		// Note: hasOnlineModels is false here since we're in privacy/offline mode
+		// PERFORMANCE: Pre-compute localFirstAI to pass to scoreModel
+		const localFirstAI = settingsState.globalSettings.localFirstAI ?? false;
 		const scored = localModels.map(model => {
-			const ruleScore = this.scoreModel(model, context, settingsState, false);
+			const ruleScore = this.scoreModel(model, context, settingsState, false, localFirstAI);
 			const learnedScore = this.getLearnedScore(model, context);
 			const finalScore = ruleScore * 0.7 + learnedScore * 0.3;
 			return {

@@ -18,7 +18,7 @@ import { Emitter, Event } from '../../../common/event.js';
 import { KeyCode, KeyMod, ScanCode, ScanCodeUtils } from '../../../common/keyCodes.js';
 import { ResolvedKeybinding } from '../../../common/keybindings.js';
 import { Disposable, DisposableStore, dispose, IDisposable } from '../../../common/lifecycle.js';
-import { isMacintosh } from '../../../common/platform.js';
+import { isMacintosh, isWindows } from '../../../common/platform.js';
 import * as strings from '../../../common/strings.js';
 import './menubar.css';
 import * as nls from '../../../../nls.js';
@@ -986,7 +986,10 @@ export class MenuBar extends Disposable {
 			}
 
 			if (this.focusedMenu.holder) {
-				this.focusedMenu.holder.parentElement?.classList.remove('open');
+				// Remove 'open' class from button element (not from document.body on Windows)
+				const actualMenuIndex = this.focusedMenu.index >= this.numMenusShown ? MenuBar.OVERFLOW_INDEX : this.focusedMenu.index;
+				const customMenu = actualMenuIndex === MenuBar.OVERFLOW_INDEX ? this.overflowMenu : this.menus[actualMenuIndex];
+				customMenu.buttonElement?.classList.remove('open');
 
 				this.focusedMenu.holder.remove();
 			}
@@ -1032,7 +1035,14 @@ export class MenuBar extends Disposable {
 			menuHolder.style.top = `${titleBoundingRect.bottom * titleBoundingRectZoom}px`;
 		}
 
-		customMenu.buttonElement.appendChild(menuHolder);
+		// On Windows, append dropdown to document.body to avoid stacking context issues
+		// where the dropdown renders behind the workbench content
+		if (isWindows) {
+			const window = DOM.getWindow(this.container);
+			window.document.body.appendChild(menuHolder);
+		} else {
+			customMenu.buttonElement.appendChild(menuHolder);
+		}
 
 		const menuOptions: IMenuOptions = {
 			getKeyBinding: this.options.getKeybinding,

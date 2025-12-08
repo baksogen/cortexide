@@ -24,7 +24,7 @@ const controlFilePath = path.join(os.homedir(), '.vscode-oss-dev', 'extensions',
 const ENABLE_LOGGING = !process.env['VSCODE_BUILD_BUILTIN_EXTENSIONS_SILENCE_PLEASE'];
 function log(...messages) {
     if (ENABLE_LOGGING) {
-        (0, fancy_log_1.default)(...messages);
+        (0, fancy_log_1)(...messages);
     }
 }
 function getExtensionPath(extension) {
@@ -60,7 +60,7 @@ function getExtensionDownloadStream(extension) {
 function getExtensionStream(extension) {
     // if the extension exists on disk, use those files instead of downloading anew
     if (isUpToDate(extension)) {
-        log('[extensions]', `${extension.name}@${extension.version} up to date`, ansi_colors_1.default.green('✔︎'));
+        log('[extensions]', `${extension.name}@${extension.version} up to date`, ansi_colors_1.green('✔︎'));
         return vinyl_fs.src(['**'], { cwd: getExtensionPath(extension), dot: true })
             .pipe((0, gulp_rename_1.default)(p => p.dirname = `${extension.name}/${p.dirname}`));
     }
@@ -68,41 +68,41 @@ function getExtensionStream(extension) {
 }
 function syncMarketplaceExtension(extension) {
     const galleryServiceUrl = productjson.extensionsGallery?.serviceUrl;
-    const source = ansi_colors_1.default.blue(galleryServiceUrl ? '[marketplace]' : '[github]');
+    const source = ansi_colors_1.blue(galleryServiceUrl ? '[marketplace]' : '[github]');
     if (isUpToDate(extension)) {
-        log(source, `${extension.name}@${extension.version}`, ansi_colors_1.default.green('✔︎'));
-        return event_stream_1.default.readArray([]);
+        log(source, `${extension.name}@${extension.version}`, ansi_colors_1.green('✔︎'));
+        return event_stream_1.readArray([]);
     }
     rimraf_1.default.sync(getExtensionPath(extension));
     return getExtensionDownloadStream(extension)
         .pipe(vinyl_fs.dest('.build/builtInExtensions'))
-        .on('end', () => log(source, extension.name, ansi_colors_1.default.green('✔︎')));
+        .on('end', () => log(source, extension.name, ansi_colors_1.green('✔︎')));
 }
 function syncExtension(extension, controlState) {
     if (extension.platforms) {
         const platforms = new Set(extension.platforms);
         if (!platforms.has(process.platform)) {
-            log(ansi_colors_1.default.gray('[skip]'), `${extension.name}@${extension.version}: Platform '${process.platform}' not supported: [${extension.platforms}]`, ansi_colors_1.default.green('✔︎'));
-            return event_stream_1.default.readArray([]);
+            log(ansi_colors_1.gray('[skip]'), `${extension.name}@${extension.version}: Platform '${process.platform}' not supported: [${extension.platforms}]`, ansi_colors_1.green('✔︎'));
+            return event_stream_1.readArray([]);
         }
     }
     switch (controlState) {
         case 'disabled':
-            log(ansi_colors_1.default.blue('[disabled]'), ansi_colors_1.default.gray(extension.name));
-            return event_stream_1.default.readArray([]);
+            log(ansi_colors_1.blue('[disabled]'), ansi_colors_1.gray(extension.name));
+            return event_stream_1.readArray([]);
         case 'marketplace':
             return syncMarketplaceExtension(extension);
         default:
             if (!fs.existsSync(controlState)) {
-                log(ansi_colors_1.default.red(`Error: Built-in extension '${extension.name}' is configured to run from '${controlState}' but that path does not exist.`));
-                return event_stream_1.default.readArray([]);
+                log(ansi_colors_1.red(`Error: Built-in extension '${extension.name}' is configured to run from '${controlState}' but that path does not exist.`));
+                return event_stream_1.readArray([]);
             }
             else if (!fs.existsSync(path.join(controlState, 'package.json'))) {
-                log(ansi_colors_1.default.red(`Error: Built-in extension '${extension.name}' is configured to run from '${controlState}' but there is no 'package.json' file in that directory.`));
-                return event_stream_1.default.readArray([]);
+                log(ansi_colors_1.red(`Error: Built-in extension '${extension.name}' is configured to run from '${controlState}' but there is no 'package.json' file in that directory.`));
+                return event_stream_1.readArray([]);
             }
-            log(ansi_colors_1.default.blue('[local]'), `${extension.name}: ${ansi_colors_1.default.cyan(controlState)}`, ansi_colors_1.default.green('✔︎'));
-            return event_stream_1.default.readArray([]);
+            log(ansi_colors_1.blue('[local]'), `${extension.name}: ${ansi_colors_1.cyan(controlState)}`, ansi_colors_1.green('✔︎'));
+            return event_stream_1.readArray([]);
     }
 }
 function readControlFile() {
@@ -119,7 +119,7 @@ function writeControlFile(control) {
 }
 function getBuiltInExtensions() {
     log('Synchronizing built-in extensions...');
-    log(`You can manage built-in extensions with the ${ansi_colors_1.default.cyan('--builtin')} flag`);
+    log(`You can manage built-in extensions with the ${ansi_colors_1.cyan('--builtin')} flag`);
     const control = readControlFile();
     const streams = [];
     for (const extension of [...builtInExtensions, ...webBuiltInExtensions]) {
@@ -129,7 +129,7 @@ function getBuiltInExtensions() {
     }
     writeControlFile(control);
     return new Promise((resolve, reject) => {
-        event_stream_1.default.merge(streams)
+        event_stream_1.merge(streams)
             .on('error', reject)
             .on('end', resolve);
     });

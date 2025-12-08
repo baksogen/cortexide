@@ -48,7 +48,7 @@ const typescript_1 = __importDefault(require("typescript"));
 const stream_1 = require("stream");
 const path = require("path");
 const utils_1 = require("./utils");
-const fs = require("fs");
+const fs_1 = require("fs");
 const fancy_log_1 = __importDefault(require("fancy-log"));
 const transpiler_1 = require("./transpiler");
 const colors = require("ansi-colors");
@@ -152,10 +152,10 @@ function create(projectPath, existingOptions, config, onError = _defaultOnError)
                 let path;
                 for (; more && _pos < _fileNames.length; _pos++) {
                     path = _fileNames[_pos];
-                    more = this.push(new vinyl_1.default({
-                        path,
-                        contents: (0, fs_1.readFileSync)(path),
-                        stat: (0, fs_1.statSync)(path),
+					more = this.push(new vinyl_1.default({
+						path,
+						contents: fs_1.readFileSync(path),
+						stat: fs_1.statSync(path),
                         cwd: opts && opts.cwd,
                         base: opts && opts.base || (0, path.dirname)(projectPath)
                     }));

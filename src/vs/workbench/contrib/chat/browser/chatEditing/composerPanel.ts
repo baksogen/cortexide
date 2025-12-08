@@ -79,6 +79,9 @@ export class ComposerPanel extends ViewPane {
 	private _unifiedDiffView: ComposerUnifiedDiffView | undefined;
 	private _summaryStats = observableValue<{ filesChanged: number; linesAdded: number; linesRemoved: number; hunks: number } | undefined>(this, undefined);
 	private _hasAgent = observableValue<boolean>(this, false);
+	// Cache for computed diffs in summary stats to avoid recomputing for unchanged files
+	// Key: entryId + originalVersion + modifiedVersion
+	private readonly _summaryDiffCache = new Map<string, Promise<{ diff: any; originalVersion: number; modifiedVersion: number }>>();
 
 	constructor(
 		options: IViewletViewOptions,
@@ -147,6 +150,7 @@ export class ComposerPanel extends ViewPane {
 	}
 
 	override dispose(): void {
+		this._summaryDiffCache.clear();
 		this._disposables.dispose();
 		this._sessionDisposables.dispose();
 		super.dispose();
@@ -232,453 +236,453 @@ export class ComposerPanel extends ViewPane {
 
 			// Scope selector section
 			const scopeSection = document.createElement('div');
-		scopeSection.className = 'composer-scope-section';
-		scopeSection.setAttribute('role', 'region');
-		scopeSection.setAttribute('aria-label', localize('composer.scopeRegion', "Refactoring scope selection"));
-		parent.appendChild(scopeSection);
+			scopeSection.className = 'composer-scope-section';
+			scopeSection.setAttribute('role', 'region');
+			scopeSection.setAttribute('aria-label', localize('composer.scopeRegion', "Refactoring scope selection"));
+			parent.appendChild(scopeSection);
 
-		const scopeHeader = document.createElement('div');
-		scopeHeader.className = 'composer-scope-header';
-		scopeSection.appendChild(scopeHeader);
+			const scopeHeader = document.createElement('div');
+			scopeHeader.className = 'composer-scope-header';
+			scopeSection.appendChild(scopeHeader);
 
-		const scopeLabel = document.createElement('label');
-		scopeLabel.textContent = localize('composer.scope', "Scope:");
-		scopeLabel.className = 'composer-label';
-		scopeHeader.appendChild(scopeLabel);
+			const scopeLabel = document.createElement('label');
+			scopeLabel.textContent = localize('composer.scope', "Scope:");
+			scopeLabel.className = 'composer-label';
+			scopeHeader.appendChild(scopeLabel);
 
-		const scopeIndicator = document.createElement('div');
-		scopeIndicator.className = 'composer-scope-indicator';
-		scopeHeader.appendChild(scopeIndicator);
+			const scopeIndicator = document.createElement('div');
+			scopeIndicator.className = 'composer-scope-indicator';
+			scopeHeader.appendChild(scopeIndicator);
 
-		// Update scope indicator reactively
-		this._register(autorun(reader => {
-			const items = this._scopeItems.read(reader);
-			const isAgentMode = this._isAgentMode.read(reader);
-			const isAutoDiscovering = this._isAutoDiscovering.read(reader);
+			// Update scope indicator reactively
+			this._register(autorun(reader => {
+				const items = this._scopeItems.read(reader);
+				const isAgentMode = this._isAgentMode.read(reader);
+				const isAutoDiscovering = this._isAutoDiscovering.read(reader);
 
-			if (isAutoDiscovering) {
-				scopeIndicator.textContent = localize('composer.discovering', "Discovering files...");
-			} else if (isAgentMode && items.length === 0) {
-				scopeIndicator.textContent = localize('composer.agentModeHint', "Enter goal to auto-discover files");
-			} else {
-				scopeIndicator.textContent = items.length === 0
-					? localize('composer.noScope', "No files selected")
-					: localize('composer.scopeCount', "{0} item{1} selected", items.length, items.length === 1 ? '' : 's');
-			}
-		}));
+				if (isAutoDiscovering) {
+					scopeIndicator.textContent = localize('composer.discovering', "Discovering files...");
+				} else if (isAgentMode && items.length === 0) {
+					scopeIndicator.textContent = localize('composer.agentModeHint', "Enter goal to auto-discover files");
+				} else {
+					scopeIndicator.textContent = items.length === 0
+						? localize('composer.noScope', "No files selected")
+						: localize('composer.scopeCount', "{0} item{1} selected", items.length, items.length === 1 ? '' : 's');
+				}
+			}));
 
-		// Scope action buttons
-		const scopeActions = document.createElement('div');
-		scopeActions.className = 'composer-scope-actions';
-		scopeSection.appendChild(scopeActions);
+			// Scope action buttons
+			const scopeActions = document.createElement('div');
+			scopeActions.className = 'composer-scope-actions';
+			scopeSection.appendChild(scopeActions);
 
-		const btnAddFile = document.createElement('button');
-		btnAddFile.className = 'composer-scope-btn';
-		btnAddFile.textContent = localize('composer.addFile', "Add File");
-		btnAddFile.setAttribute('aria-label', localize('composer.addFileAria', "Add files to refactoring scope"));
-		btnAddFile.setAttribute('tabindex', '0');
-		btnAddFile.onclick = () => this.addFiles();
-		scopeActions.appendChild(btnAddFile);
+			const btnAddFile = document.createElement('button');
+			btnAddFile.className = 'composer-scope-btn';
+			btnAddFile.textContent = localize('composer.addFile', "Add File");
+			btnAddFile.setAttribute('aria-label', localize('composer.addFileAria', "Add files to refactoring scope"));
+			btnAddFile.setAttribute('tabindex', '0');
+			btnAddFile.onclick = () => this.addFiles();
+			scopeActions.appendChild(btnAddFile);
 
-		const btnAddFolder = document.createElement('button');
-		btnAddFolder.className = 'composer-scope-btn';
-		btnAddFolder.textContent = localize('composer.addFolder', "Add Folder");
-		btnAddFolder.setAttribute('aria-label', localize('composer.addFolderAria', "Add folder to refactoring scope"));
-		btnAddFolder.onclick = () => this.addFolder();
-		scopeActions.appendChild(btnAddFolder);
+			const btnAddFolder = document.createElement('button');
+			btnAddFolder.className = 'composer-scope-btn';
+			btnAddFolder.textContent = localize('composer.addFolder', "Add Folder");
+			btnAddFolder.setAttribute('aria-label', localize('composer.addFolderAria', "Add folder to refactoring scope"));
+			btnAddFolder.onclick = () => this.addFolder();
+			scopeActions.appendChild(btnAddFolder);
 
-		const btnAddSymbol = document.createElement('button');
-		btnAddSymbol.className = 'composer-scope-btn';
-		btnAddSymbol.textContent = localize('composer.addSymbol', "Add Symbol");
-		btnAddSymbol.setAttribute('aria-label', localize('composer.addSymbolAria', "Add symbol to refactoring scope"));
-		btnAddSymbol.onclick = () => this.addSymbol();
-		scopeActions.appendChild(btnAddSymbol);
+			const btnAddSymbol = document.createElement('button');
+			btnAddSymbol.className = 'composer-scope-btn';
+			btnAddSymbol.textContent = localize('composer.addSymbol', "Add Symbol");
+			btnAddSymbol.setAttribute('aria-label', localize('composer.addSymbolAria', "Add symbol to refactoring scope"));
+			btnAddSymbol.onclick = () => this.addSymbol();
+			scopeActions.appendChild(btnAddSymbol);
 
-		const btnAddGlob = document.createElement('button');
-		btnAddGlob.className = 'composer-scope-btn';
-		btnAddGlob.textContent = localize('composer.addGlob', "Add Glob");
-		btnAddGlob.setAttribute('aria-label', localize('composer.addGlobAria', "Add glob pattern to refactoring scope"));
-		btnAddGlob.onclick = () => this.addGlobPattern();
-		scopeActions.appendChild(btnAddGlob);
+			const btnAddGlob = document.createElement('button');
+			btnAddGlob.className = 'composer-scope-btn';
+			btnAddGlob.textContent = localize('composer.addGlob', "Add Glob");
+			btnAddGlob.setAttribute('aria-label', localize('composer.addGlobAria', "Add glob pattern to refactoring scope"));
+			btnAddGlob.onclick = () => this.addGlobPattern();
+			scopeActions.appendChild(btnAddGlob);
 
-		const btnBrowseWorkspace = document.createElement('button');
-		btnBrowseWorkspace.className = 'composer-scope-btn composer-scope-btn-primary';
-		btnBrowseWorkspace.textContent = localize('composer.browseWorkspace', "Browse Workspace");
-		btnBrowseWorkspace.setAttribute('aria-label', localize('composer.browseWorkspaceAria', "Browse workspace to select files and folders"));
-		btnBrowseWorkspace.onclick = () => this.browseWorkspace();
-		scopeActions.appendChild(btnBrowseWorkspace);
+			const btnBrowseWorkspace = document.createElement('button');
+			btnBrowseWorkspace.className = 'composer-scope-btn composer-scope-btn-primary';
+			btnBrowseWorkspace.textContent = localize('composer.browseWorkspace', "Browse Workspace");
+			btnBrowseWorkspace.setAttribute('aria-label', localize('composer.browseWorkspaceAria', "Browse workspace to select files and folders"));
+			btnBrowseWorkspace.onclick = () => this.browseWorkspace();
+			scopeActions.appendChild(btnBrowseWorkspace);
 
-		const btnClear = document.createElement('button');
-		btnClear.className = 'composer-scope-btn';
-		btnClear.textContent = localize('composer.clear', "Clear");
-		btnClear.setAttribute('aria-label', localize('composer.clearAria', "Clear all items from scope"));
-		btnClear.onclick = () => this.clearScope();
-		scopeActions.appendChild(btnClear);
+			const btnClear = document.createElement('button');
+			btnClear.className = 'composer-scope-btn';
+			btnClear.textContent = localize('composer.clear', "Clear");
+			btnClear.setAttribute('aria-label', localize('composer.clearAria', "Clear all items from scope"));
+			btnClear.onclick = () => this.clearScope();
+			scopeActions.appendChild(btnClear);
 
-		// Scope items list
-		const scopeList = document.createElement('div');
-		scopeList.className = 'composer-scope-list';
-		scopeSection.appendChild(scopeList);
+			// Scope items list
+			const scopeList = document.createElement('div');
+			scopeList.className = 'composer-scope-list';
+			scopeSection.appendChild(scopeList);
 
-		// Show/hide manual scope controls based on mode (moved here after scopeActions and scopeList are declared)
-		this._register(autorun(reader => {
-			const isAgentMode = this._isAgentMode.read(reader);
-			if (isAgentMode) {
-				scopeActions.style.display = 'none';
-				scopeList.style.display = 'none';
-			} else {
-				scopeActions.style.display = 'flex';
-				scopeList.style.display = 'block';
-			}
-		}));
+			// Show/hide manual scope controls based on mode (moved here after scopeActions and scopeList are declared)
+			this._register(autorun(reader => {
+				const isAgentMode = this._isAgentMode.read(reader);
+				if (isAgentMode) {
+					scopeActions.style.display = 'none';
+					scopeList.style.display = 'none';
+				} else {
+					scopeActions.style.display = 'flex';
+					scopeList.style.display = 'block';
+				}
+			}));
 
-		this._register(autorun(reader => {
-			const items = this._scopeItems.read(reader);
-			// Clear existing items safely
-			while (scopeList.firstChild) {
-				scopeList.removeChild(scopeList.firstChild);
-			}
+			this._register(autorun(reader => {
+				const items = this._scopeItems.read(reader);
+				// Clear existing items safely
+				while (scopeList.firstChild) {
+					scopeList.removeChild(scopeList.firstChild);
+				}
 
-			items.forEach((item, index) => {
-				const itemEl = document.createElement('div');
-				itemEl.className = 'composer-scope-item';
+				items.forEach((item, index) => {
+					const itemEl = document.createElement('div');
+					itemEl.className = 'composer-scope-item';
 
-				const labelSpan = document.createElement('span');
-				labelSpan.className = 'composer-scope-item-label';
-				labelSpan.textContent = item.label;
-				itemEl.appendChild(labelSpan);
+					const labelSpan = document.createElement('span');
+					labelSpan.className = 'composer-scope-item-label';
+					labelSpan.textContent = item.label;
+					itemEl.appendChild(labelSpan);
 
-				const typeSpan = document.createElement('span');
-				typeSpan.className = 'composer-scope-item-type';
-				typeSpan.textContent = item.type;
-				itemEl.appendChild(typeSpan);
+					const typeSpan = document.createElement('span');
+					typeSpan.className = 'composer-scope-item-type';
+					typeSpan.textContent = item.type;
+					itemEl.appendChild(typeSpan);
 
-				const removeBtn = document.createElement('button');
-				removeBtn.className = 'composer-scope-item-remove';
-				removeBtn.textContent = '×';
-				removeBtn.setAttribute('data-index', index.toString());
-				removeBtn.onclick = () => this.removeScopeItem(index);
-				itemEl.appendChild(removeBtn);
+					const removeBtn = document.createElement('button');
+					removeBtn.className = 'composer-scope-item-remove';
+					removeBtn.textContent = '×';
+					removeBtn.setAttribute('data-index', index.toString());
+					removeBtn.onclick = () => this.removeScopeItem(index);
+					itemEl.appendChild(removeBtn);
 
-				scopeList.appendChild(itemEl);
+					scopeList.appendChild(itemEl);
+				});
+			}));
+
+			// Goal input section
+			const goalSection = document.createElement('div');
+			goalSection.className = 'composer-goal-section';
+			parent.appendChild(goalSection);
+
+			const goalLabel = document.createElement('label');
+			goalLabel.textContent = localize('composer.goal', "Refactoring goal:");
+			goalLabel.className = 'composer-label';
+			goalSection.appendChild(goalLabel);
+
+			const goalInput = document.createElement('textarea');
+			goalInput.className = 'composer-goal-input';
+			goalInput.placeholder = localize('composer.goalPlaceholder', "e.g., Convert callbacks to async/await");
+			goalInput.rows = 3;
+			goalInput.setAttribute('aria-label', localize('composer.goalAria', "Refactoring goal description"));
+			goalInput.setAttribute('aria-describedby', 'composer-goal-description');
+			goalSection.appendChild(goalInput);
+
+			// Update goal and placeholder reactively
+			this._register(autorun(reader => {
+				const goal = this._goal.read(reader);
+				const isAgentMode = this._isAgentMode.read(reader);
+				if (goalInput.value !== goal) {
+					goalInput.value = goal;
+				}
+				// Update placeholder based on mode
+				if (isAgentMode) {
+					goalInput.placeholder = localize('composer.goalPlaceholderAgent', "e.g., Convert callbacks to async/await (Agent will discover relevant files)");
+				} else {
+					goalInput.placeholder = localize('composer.goalPlaceholder', "e.g., Convert callbacks to async/await");
+				}
+			}));
+
+			let autoDiscoverTimeout: TimerHandle | undefined;
+			goalInput.addEventListener('input', () => {
+				this._goal.set(goalInput.value, undefined);
+
+				// Auto-discover in Agent Mode when goal is entered (debounced)
+				const isAgentMode = this._isAgentMode.get();
+				if (autoDiscoverTimeout) {
+					clearTimeout(autoDiscoverTimeout);
+				}
+
+				if (isAgentMode && goalInput.value.trim().length > 10) {
+					autoDiscoverTimeout = setTimeout(() => {
+						if (goalInput.value.trim().length > 10 && this._isAgentMode.get()) {
+							this._autoDiscoverFiles(goalInput.value.trim());
+						}
+					}, 1500);
+				}
 			});
-		}));
 
-		// Goal input section
-		const goalSection = document.createElement('div');
-		goalSection.className = 'composer-goal-section';
-		parent.appendChild(goalSection);
+			// Agent availability warning
+			const agentWarningContainer = document.createElement('div');
+			agentWarningContainer.className = 'composer-agent-warning';
+			agentWarningContainer.style.display = 'none';
+			agentWarningContainer.style.padding = '12px';
+			agentWarningContainer.style.margin = '10px 0';
+			agentWarningContainer.style.backgroundColor = 'var(--vscode-inputValidation-warningBackground)';
+			agentWarningContainer.style.border = '1px solid var(--vscode-inputValidation-warningBorder)';
+			agentWarningContainer.style.borderRadius = '4px';
+			parent.appendChild(agentWarningContainer);
 
-		const goalLabel = document.createElement('label');
-		goalLabel.textContent = localize('composer.goal', "Refactoring goal:");
-		goalLabel.className = 'composer-label';
-		goalSection.appendChild(goalLabel);
+			const agentWarningText = document.createElement('div');
+			agentWarningText.style.color = 'var(--vscode-inputValidation-warningForeground)';
+			agentWarningText.textContent = localize('composer.noAgentWarning', "No chat agent is available. Please install a chat agent extension to generate proposals.");
+			agentWarningContainer.appendChild(agentWarningText);
 
-		const goalInput = document.createElement('textarea');
-		goalInput.className = 'composer-goal-input';
-		goalInput.placeholder = localize('composer.goalPlaceholder', "e.g., Convert callbacks to async/await");
-		goalInput.rows = 3;
-		goalInput.setAttribute('aria-label', localize('composer.goalAria', "Refactoring goal description"));
-		goalInput.setAttribute('aria-describedby', 'composer-goal-description');
-		goalSection.appendChild(goalInput);
+			// Show/hide agent warning
+			this._register(autorun(reader => {
+				const hasAgent = this._hasAgent.read(reader);
+				agentWarningContainer.style.display = hasAgent ? 'none' : 'block';
+			}));
 
-		// Update goal and placeholder reactively
-		this._register(autorun(reader => {
-			const goal = this._goal.read(reader);
-			const isAgentMode = this._isAgentMode.read(reader);
-			if (goalInput.value !== goal) {
-				goalInput.value = goal;
-			}
-			// Update placeholder based on mode
-			if (isAgentMode) {
-				goalInput.placeholder = localize('composer.goalPlaceholderAgent', "e.g., Convert callbacks to async/await (Agent will discover relevant files)");
-			} else {
-				goalInput.placeholder = localize('composer.goalPlaceholder', "e.g., Convert callbacks to async/await");
-			}
-		}));
+			// Action buttons
+			const buttonsContainer = document.createElement('div');
+			buttonsContainer.className = 'composer-buttons';
+			parent.appendChild(buttonsContainer);
+			const buttonBar = new ButtonBar(buttonsContainer);
+			this._disposables.add(buttonBar);
 
-		let autoDiscoverTimeout: TimerHandle | undefined;
-		goalInput.addEventListener('input', () => {
-			this._goal.set(goalInput.value, undefined);
+			const btnGenerate = buttonBar.addButton({ supportIcons: true, ...defaultButtonStyles });
+			btnGenerate.label = localize('composer.generate', "Generate Proposals");
+			btnGenerate.enabled = false;
+			btnGenerate.onDidClick(() => this.generateProposals(), this, this._disposables);
 
-			// Auto-discover in Agent Mode when goal is entered (debounced)
-			const isAgentMode = this._isAgentMode.get();
-			if (autoDiscoverTimeout) {
-				clearTimeout(autoDiscoverTimeout);
-			}
+			// Enable generate button when scope and goal are set (or in Agent Mode with goal) AND agent is available
+			this._register(autorun(reader => {
+				const goalText = this._goal.read(reader);
+				const isAgentMode = this._isAgentMode.read(reader);
+				const hasScope = this._scopeItems.read(reader).length > 0;
+				const isGenerating = this._isGenerating.read(reader);
+				const hasAgent = this._hasAgent.read(reader);
 
-			if (isAgentMode && goalInput.value.trim().length > 10) {
-				autoDiscoverTimeout = setTimeout(() => {
-					if (goalInput.value.trim().length > 10 && this._isAgentMode.get()) {
-						this._autoDiscoverFiles(goalInput.value.trim());
-					}
-				}, 1500);
-			}
-		});
+				// In Agent Mode, only need goal (auto-discovery will handle scope)
+				// In Normal Mode, need both scope and goal
+				// Also require an agent to be available
+				btnGenerate.enabled = hasAgent && goalText.trim().length > 0 && (isAgentMode || hasScope) && !isGenerating;
+			}));
 
-		// Agent availability warning
-		const agentWarningContainer = document.createElement('div');
-		agentWarningContainer.className = 'composer-agent-warning';
-		agentWarningContainer.style.display = 'none';
-		agentWarningContainer.style.padding = '12px';
-		agentWarningContainer.style.margin = '10px 0';
-		agentWarningContainer.style.backgroundColor = 'var(--vscode-inputValidation-warningBackground)';
-		agentWarningContainer.style.border = '1px solid var(--vscode-inputValidation-warningBorder)';
-		agentWarningContainer.style.borderRadius = '4px';
-		parent.appendChild(agentWarningContainer);
+			const btnApplyAll = buttonBar.addButton({ supportIcons: true, ...defaultButtonStyles });
+			btnApplyAll.label = localize('composer.applyAll', "Apply All");
+			btnApplyAll.onDidClick(() => this.applyAll(), this, this._disposables);
 
-		const agentWarningText = document.createElement('div');
-		agentWarningText.style.color = 'var(--vscode-inputValidation-warningForeground)';
-		agentWarningText.textContent = localize('composer.noAgentWarning', "No chat agent is available. Please install a chat agent extension to generate proposals.");
-		agentWarningContainer.appendChild(agentWarningText);
+			const btnRejectAll = buttonBar.addButton({ ...defaultButtonStyles, secondary: true });
+			btnRejectAll.label = localize('composer.rejectAll', "Reject All");
+			btnRejectAll.onDidClick(() => this.rejectAll(), this, this._disposables);
 
-		// Show/hide agent warning
-		this._register(autorun(reader => {
-			const hasAgent = this._hasAgent.read(reader);
-			agentWarningContainer.style.display = hasAgent ? 'none' : 'block';
-		}));
+			const btnUndo = buttonBar.addButton({ ...defaultButtonStyles, secondary: true });
+			btnUndo.label = localize('composer.undo', "Undo");
+			btnUndo.onDidClick(() => this.undo(), this, this._disposables);
 
-		// Action buttons
-		const buttonsContainer = document.createElement('div');
-		buttonsContainer.className = 'composer-buttons';
-		parent.appendChild(buttonsContainer);
-		const buttonBar = new ButtonBar(buttonsContainer);
-		this._disposables.add(buttonBar);
+			const btnRedo = buttonBar.addButton({ ...defaultButtonStyles, secondary: true });
+			btnRedo.label = localize('composer.redo', "Redo");
+			btnRedo.onDidClick(() => this.redo(), this, this._disposables);
 
-		const btnGenerate = buttonBar.addButton({ supportIcons: true, ...defaultButtonStyles });
-		btnGenerate.label = localize('composer.generate', "Generate Proposals");
-		btnGenerate.enabled = false;
-		btnGenerate.onDidClick(() => this.generateProposals(), this, this._disposables);
+			// Enable/disable buttons based on state
+			this._register(autorun(reader => {
+				const hasProposals = this._currentSession !== undefined && this._currentSession.entries.read(reader).length > 0;
+				const isGenerating = this._isGenerating.read(reader);
+				const canUndo = this._currentSession?.canUndo.read(reader) ?? false;
+				const canRedo = this._currentSession?.canRedo.read(reader) ?? false;
 
-		// Enable generate button when scope and goal are set (or in Agent Mode with goal) AND agent is available
-		this._register(autorun(reader => {
-			const goalText = this._goal.read(reader);
-			const isAgentMode = this._isAgentMode.read(reader);
-			const hasScope = this._scopeItems.read(reader).length > 0;
-			const isGenerating = this._isGenerating.read(reader);
-			const hasAgent = this._hasAgent.read(reader);
+				btnApplyAll.enabled = hasProposals && !isGenerating;
+				btnRejectAll.enabled = hasProposals && !isGenerating;
+				btnUndo.enabled = canUndo && !isGenerating;
+				btnRedo.enabled = canRedo && !isGenerating;
+			}));
 
-			// In Agent Mode, only need goal (auto-discovery will handle scope)
-			// In Normal Mode, need both scope and goal
-			// Also require an agent to be available
-			btnGenerate.enabled = hasAgent && goalText.trim().length > 0 && (isAgentMode || hasScope) && !isGenerating;
-		}));
+			// Progress indicator
+			const progressContainer = document.createElement('div');
+			progressContainer.className = 'composer-progress';
+			progressContainer.style.display = 'none';
+			parent.appendChild(progressContainer);
 
-		const btnApplyAll = buttonBar.addButton({ supportIcons: true, ...defaultButtonStyles });
-		btnApplyAll.label = localize('composer.applyAll', "Apply All");
-		btnApplyAll.onDidClick(() => this.applyAll(), this, this._disposables);
-
-		const btnRejectAll = buttonBar.addButton({ ...defaultButtonStyles, secondary: true });
-		btnRejectAll.label = localize('composer.rejectAll', "Reject All");
-		btnRejectAll.onDidClick(() => this.rejectAll(), this, this._disposables);
-
-		const btnUndo = buttonBar.addButton({ ...defaultButtonStyles, secondary: true });
-		btnUndo.label = localize('composer.undo', "Undo");
-		btnUndo.onDidClick(() => this.undo(), this, this._disposables);
-
-		const btnRedo = buttonBar.addButton({ ...defaultButtonStyles, secondary: true });
-		btnRedo.label = localize('composer.redo', "Redo");
-		btnRedo.onDidClick(() => this.redo(), this, this._disposables);
-
-		// Enable/disable buttons based on state
-		this._register(autorun(reader => {
-			const hasProposals = this._currentSession !== undefined && this._currentSession.entries.read(reader).length > 0;
-			const isGenerating = this._isGenerating.read(reader);
-			const canUndo = this._currentSession?.canUndo.read(reader) ?? false;
-			const canRedo = this._currentSession?.canRedo.read(reader) ?? false;
-
-			btnApplyAll.enabled = hasProposals && !isGenerating;
-			btnRejectAll.enabled = hasProposals && !isGenerating;
-			btnUndo.enabled = canUndo && !isGenerating;
-			btnRedo.enabled = canRedo && !isGenerating;
-		}));
-
-		// Progress indicator
-		const progressContainer = document.createElement('div');
-		progressContainer.className = 'composer-progress';
-		progressContainer.style.display = 'none';
-		parent.appendChild(progressContainer);
-
-		this._register(autorun(reader => {
-			const isGenerating = this._isGenerating.read(reader);
-			const isAutoDiscovering = this._isAutoDiscovering.read(reader);
-			progressContainer.style.display = (isGenerating || isAutoDiscovering) ? 'block' : 'none';
-			if (isGenerating) {
-				progressContainer.textContent = localize('composer.generating', "Generating proposals...");
-			} else if (isAutoDiscovering) {
-				progressContainer.textContent = localize('composer.discovering', "Discovering relevant files...");
-			}
-		}));
-
-		// Preview Summary Section (collapsible)
-		const summarySection = document.createElement('div');
-		summarySection.className = 'composer-summary-section';
-		summarySection.style.display = 'none';
-		parent.appendChild(summarySection);
-
-		const summaryHeader = document.createElement('div');
-		summaryHeader.className = 'composer-summary-header';
-		summarySection.appendChild(summaryHeader);
-
-		const summaryToggle = document.createElement('button');
-		summaryToggle.className = 'composer-summary-toggle';
-		summaryToggle.setAttribute('aria-expanded', 'false');
-		summaryHeader.appendChild(summaryToggle);
-
-		const summaryTitle = document.createElement('span');
-		summaryTitle.className = 'composer-summary-title';
-		summaryTitle.textContent = localize('composer.summary', "Summary");
-		summaryHeader.appendChild(summaryTitle);
-
-		const summaryContent = document.createElement('div');
-		summaryContent.className = 'composer-summary-content';
-		summarySection.appendChild(summaryContent);
-
-		let summaryExpanded = false;
-		summaryToggle.onclick = () => {
-			summaryExpanded = !summaryExpanded;
-			summaryToggle.setAttribute('aria-expanded', summaryExpanded.toString());
-			summaryContent.style.display = summaryExpanded ? 'block' : 'none';
-			summaryToggle.textContent = summaryExpanded ? '▼' : '▶';
-		};
-		summaryToggle.textContent = '▶';
-
-		// Update summary content reactively
-		this._register(autorun(reader => {
-			const stats = this._summaryStats.read(reader);
-			const hasProposals = this._currentSession !== undefined && this._currentSession.entries.read(reader).length > 0;
-
-			if (stats && hasProposals) {
-				summarySection.style.display = 'block';
-				// Clear existing content safely
-				while (summaryContent.firstChild) {
-					summaryContent.removeChild(summaryContent.firstChild);
+			this._register(autorun(reader => {
+				const isGenerating = this._isGenerating.read(reader);
+				const isAutoDiscovering = this._isAutoDiscovering.read(reader);
+				progressContainer.style.display = (isGenerating || isAutoDiscovering) ? 'block' : 'none';
+				if (isGenerating) {
+					progressContainer.textContent = localize('composer.generating', "Generating proposals...");
+				} else if (isAutoDiscovering) {
+					progressContainer.textContent = localize('composer.discovering', "Discovering relevant files...");
 				}
+			}));
 
-				// Files changed stat
-				const filesStat = document.createElement('div');
-				filesStat.className = 'composer-summary-stat';
-				const filesLabel = document.createElement('span');
-				filesLabel.className = 'composer-summary-label';
-				filesLabel.textContent = localize('composer.filesChanged', "Files changed:");
-				const filesValue = document.createElement('span');
-				filesValue.className = 'composer-summary-value';
-				filesValue.textContent = stats.filesChanged.toString();
-				filesStat.appendChild(filesLabel);
-				filesStat.appendChild(filesValue);
-				summaryContent.appendChild(filesStat);
+			// Preview Summary Section (collapsible)
+			const summarySection = document.createElement('div');
+			summarySection.className = 'composer-summary-section';
+			summarySection.style.display = 'none';
+			parent.appendChild(summarySection);
 
-				// Lines added stat
-				const addedStat = document.createElement('div');
-				addedStat.className = 'composer-summary-stat';
-				const addedLabel = document.createElement('span');
-				addedLabel.className = 'composer-summary-label';
-				addedLabel.textContent = localize('composer.linesAdded', "Lines added:");
-				const addedValue = document.createElement('span');
-				addedValue.className = 'composer-summary-value composer-summary-added';
-				addedValue.textContent = `+${stats.linesAdded}`;
-				addedStat.appendChild(addedLabel);
-				addedStat.appendChild(addedValue);
-				summaryContent.appendChild(addedStat);
+			const summaryHeader = document.createElement('div');
+			summaryHeader.className = 'composer-summary-header';
+			summarySection.appendChild(summaryHeader);
 
-				// Lines removed stat
-				const removedStat = document.createElement('div');
-				removedStat.className = 'composer-summary-stat';
-				const removedLabel = document.createElement('span');
-				removedLabel.className = 'composer-summary-label';
-				removedLabel.textContent = localize('composer.linesRemoved', "Lines removed:");
-				const removedValue = document.createElement('span');
-				removedValue.className = 'composer-summary-value composer-summary-removed';
-				removedValue.textContent = `-${stats.linesRemoved}`;
-				removedStat.appendChild(removedLabel);
-				removedStat.appendChild(removedValue);
-				summaryContent.appendChild(removedStat);
+			const summaryToggle = document.createElement('button');
+			summaryToggle.className = 'composer-summary-toggle';
+			summaryToggle.setAttribute('aria-expanded', 'false');
+			summaryHeader.appendChild(summaryToggle);
 
-				// Hunks stat
-				const hunksStat = document.createElement('div');
-				hunksStat.className = 'composer-summary-stat';
-				const hunksLabel = document.createElement('span');
-				hunksLabel.className = 'composer-summary-label';
-				hunksLabel.textContent = localize('composer.hunks', "Hunks:");
-				const hunksValue = document.createElement('span');
-				hunksValue.className = 'composer-summary-value';
-				hunksValue.textContent = stats.hunks.toString();
-				hunksStat.appendChild(hunksLabel);
-				hunksStat.appendChild(hunksValue);
-				summaryContent.appendChild(hunksStat);
+			const summaryTitle = document.createElement('span');
+			summaryTitle.className = 'composer-summary-title';
+			summaryTitle.textContent = localize('composer.summary', "Summary");
+			summaryHeader.appendChild(summaryTitle);
 
-				// Plan Preview: File list
-				const planPreview = document.createElement('div');
-				planPreview.className = 'composer-plan-preview';
-				const planPreviewTitle = document.createElement('div');
-				planPreviewTitle.className = 'composer-plan-preview-title';
-				planPreviewTitle.textContent = localize('composer.planPreview', "Files to be changed:");
-				planPreview.appendChild(planPreviewTitle);
+			const summaryContent = document.createElement('div');
+			summaryContent.className = 'composer-summary-content';
+			summarySection.appendChild(summaryContent);
 
-				const fileList = document.createElement('ul');
-				fileList.className = 'composer-plan-file-list';
-				const entries = this._currentSession!.entries.read(reader);
-				for (const entry of entries) {
-					const fileItem = document.createElement('li');
-					fileItem.className = 'composer-plan-file-item';
-					const fileName = document.createElement('span');
-					fileName.className = 'composer-plan-file-name';
-					fileName.textContent = this._labelService.getUriLabel(entry.modifiedURI, { relative: true });
-					fileItem.appendChild(fileName);
+			let summaryExpanded = false;
+			summaryToggle.onclick = () => {
+				summaryExpanded = !summaryExpanded;
+				summaryToggle.setAttribute('aria-expanded', summaryExpanded.toString());
+				summaryContent.style.display = summaryExpanded ? 'block' : 'none';
+				summaryToggle.textContent = summaryExpanded ? '▼' : '▶';
+			};
+			summaryToggle.textContent = '▶';
 
-					const changeCount = entry.changesCount.read(reader);
-					if (changeCount > 0) {
-						const changeBadge = document.createElement('span');
-						changeBadge.className = 'composer-plan-file-changes';
-						changeBadge.textContent = `${changeCount} change${changeCount === 1 ? '' : 's'}`;
-						fileItem.appendChild(changeBadge);
+			// Update summary content reactively
+			this._register(autorun(reader => {
+				const stats = this._summaryStats.read(reader);
+				const hasProposals = this._currentSession !== undefined && this._currentSession.entries.read(reader).length > 0;
+
+				if (stats && hasProposals) {
+					summarySection.style.display = 'block';
+					// Clear existing content safely
+					while (summaryContent.firstChild) {
+						summaryContent.removeChild(summaryContent.firstChild);
 					}
 
-					fileList.appendChild(fileItem);
+					// Files changed stat
+					const filesStat = document.createElement('div');
+					filesStat.className = 'composer-summary-stat';
+					const filesLabel = document.createElement('span');
+					filesLabel.className = 'composer-summary-label';
+					filesLabel.textContent = localize('composer.filesChanged', "Files changed:");
+					const filesValue = document.createElement('span');
+					filesValue.className = 'composer-summary-value';
+					filesValue.textContent = stats.filesChanged.toString();
+					filesStat.appendChild(filesLabel);
+					filesStat.appendChild(filesValue);
+					summaryContent.appendChild(filesStat);
+
+					// Lines added stat
+					const addedStat = document.createElement('div');
+					addedStat.className = 'composer-summary-stat';
+					const addedLabel = document.createElement('span');
+					addedLabel.className = 'composer-summary-label';
+					addedLabel.textContent = localize('composer.linesAdded', "Lines added:");
+					const addedValue = document.createElement('span');
+					addedValue.className = 'composer-summary-value composer-summary-added';
+					addedValue.textContent = `+${stats.linesAdded}`;
+					addedStat.appendChild(addedLabel);
+					addedStat.appendChild(addedValue);
+					summaryContent.appendChild(addedStat);
+
+					// Lines removed stat
+					const removedStat = document.createElement('div');
+					removedStat.className = 'composer-summary-stat';
+					const removedLabel = document.createElement('span');
+					removedLabel.className = 'composer-summary-label';
+					removedLabel.textContent = localize('composer.linesRemoved', "Lines removed:");
+					const removedValue = document.createElement('span');
+					removedValue.className = 'composer-summary-value composer-summary-removed';
+					removedValue.textContent = `-${stats.linesRemoved}`;
+					removedStat.appendChild(removedLabel);
+					removedStat.appendChild(removedValue);
+					summaryContent.appendChild(removedStat);
+
+					// Hunks stat
+					const hunksStat = document.createElement('div');
+					hunksStat.className = 'composer-summary-stat';
+					const hunksLabel = document.createElement('span');
+					hunksLabel.className = 'composer-summary-label';
+					hunksLabel.textContent = localize('composer.hunks', "Hunks:");
+					const hunksValue = document.createElement('span');
+					hunksValue.className = 'composer-summary-value';
+					hunksValue.textContent = stats.hunks.toString();
+					hunksStat.appendChild(hunksLabel);
+					hunksStat.appendChild(hunksValue);
+					summaryContent.appendChild(hunksStat);
+
+					// Plan Preview: File list
+					const planPreview = document.createElement('div');
+					planPreview.className = 'composer-plan-preview';
+					const planPreviewTitle = document.createElement('div');
+					planPreviewTitle.className = 'composer-plan-preview-title';
+					planPreviewTitle.textContent = localize('composer.planPreview', "Files to be changed:");
+					planPreview.appendChild(planPreviewTitle);
+
+					const fileList = document.createElement('ul');
+					fileList.className = 'composer-plan-file-list';
+					const entries = this._currentSession!.entries.read(reader);
+					for (const entry of entries) {
+						const fileItem = document.createElement('li');
+						fileItem.className = 'composer-plan-file-item';
+						const fileName = document.createElement('span');
+						fileName.className = 'composer-plan-file-name';
+						fileName.textContent = this._labelService.getUriLabel(entry.modifiedURI, { relative: true });
+						fileItem.appendChild(fileName);
+
+						const changeCount = entry.changesCount.read(reader);
+						if (changeCount > 0) {
+							const changeBadge = document.createElement('span');
+							changeBadge.className = 'composer-plan-file-changes';
+							changeBadge.textContent = `${changeCount} change${changeCount === 1 ? '' : 's'}`;
+							fileItem.appendChild(changeBadge);
+						}
+
+						fileList.appendChild(fileItem);
+					}
+					planPreview.appendChild(fileList);
+					summaryContent.appendChild(planPreview);
+				} else {
+					summarySection.style.display = 'none';
 				}
-				planPreview.appendChild(fileList);
-				summaryContent.appendChild(planPreview);
-			} else {
-				summarySection.style.display = 'none';
-			}
-		}));
+			}));
 
-		// Proposals display area - unified diff view
-		const proposalsContainer = document.createElement('div');
-		proposalsContainer.className = 'composer-proposals';
-		parent.appendChild(proposalsContainer);
+			// Proposals display area - unified diff view
+			const proposalsContainer = document.createElement('div');
+			proposalsContainer.className = 'composer-proposals';
+			parent.appendChild(proposalsContainer);
 
-		// Update unified diff view when session changes
-		this._register(autorun(reader => {
-			const session = this._currentSession;
-			if (session && !this._unifiedDiffView) {
-				this._unifiedDiffView = this._instantiationService.createInstance(
-					ComposerUnifiedDiffView,
-					proposalsContainer,
-					session,
-				(entry: IModifiedFileEntry, hunk: DetailedLineRangeMapping, enabled: boolean) => {
-					this._onHunkToggle(entry, hunk, enabled);
-					this._calculateSummaryStats().catch(err => console.debug('Error updating stats:', err)); // Update stats when hunks are toggled
+			// Update unified diff view when session changes
+			this._register(autorun(reader => {
+				const session = this._currentSession;
+				if (session && !this._unifiedDiffView) {
+					this._unifiedDiffView = this._instantiationService.createInstance(
+						ComposerUnifiedDiffView,
+						proposalsContainer,
+						session,
+						(entry: IModifiedFileEntry, hunk: DetailedLineRangeMapping, enabled: boolean) => {
+							this._onHunkToggle(entry, hunk, enabled);
+							this._calculateSummaryStats().catch(err => console.debug('Error updating stats:', err)); // Update stats when hunks are toggled
+						}
+					);
+					this._register(this._unifiedDiffView);
+					// Calculate initial stats
+					this._calculateSummaryStats().catch(err => console.debug('Error calculating initial stats:', err));
+				} else if (!session && this._unifiedDiffView) {
+					this._unifiedDiffView.dispose();
+					this._unifiedDiffView = undefined;
+					this._summaryStats.set(undefined, undefined);
 				}
-			);
-			this._register(this._unifiedDiffView);
-			// Calculate initial stats
-			this._calculateSummaryStats().catch(err => console.debug('Error calculating initial stats:', err));
-			} else if (!session && this._unifiedDiffView) {
-				this._unifiedDiffView.dispose();
-				this._unifiedDiffView = undefined;
-				this._summaryStats.set(undefined, undefined);
-			}
-		}));
+			}));
 
-		// Update summary stats when entries change
-		this._register(autorun(reader => {
-			if (this._currentSession) {
-				this._currentSession.entries.read(reader);
-				// Trigger stats recalculation
-				this._calculateSummaryStats().catch(err => console.debug('Error recalculating stats:', err));
-			}
-		}));
+			// Update summary stats when entries change
+			this._register(autorun(reader => {
+				if (this._currentSession) {
+					this._currentSession.entries.read(reader);
+					// Trigger stats recalculation
+					this._calculateSummaryStats().catch(err => console.debug('Error recalculating stats:', err));
+				}
+			}));
 
 			// Remove test div once everything is loaded
 			setTimeout(() => {
@@ -1167,25 +1171,69 @@ export class ComposerPanel extends ViewPane {
 		let linesRemoved = 0;
 		let hunks = 0;
 
-		// Performance optimization: Lazy diff computation - compute visible files first
-		// For now, compute all files but in batches to avoid blocking UI
-		const BATCH_SIZE = 5; // Process 5 files at a time
+		// PERFORMANCE: Increased batch size for better parallelization (was 5, now 8)
+		// Bounded concurrency: Process 8 files concurrently to balance throughput vs UI responsiveness
+		const BATCH_SIZE = 8;
+		// Track cancellation state for early bailout
+		let isCancelled = false;
 
-		// Compute accurate stats from diffs in batches
+		// Compute accurate stats from diffs in batches with parallel execution
 		for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+			// Early bailout: Check if session was closed or cancelled
+			if (!this._currentSession || this._cancellationTokenSource?.token.isCancellationRequested) {
+				isCancelled = true;
+				break;
+			}
+
 			const batch = entries.slice(i, i + BATCH_SIZE);
 			const statsPromises = batch.map(async (entry) => {
+				// Early bailout check before expensive operations
+				if (!this._currentSession || this._cancellationTokenSource?.token.isCancellationRequested) {
+					return { linesAdded: 0, linesRemoved: 0 };
+				}
+
 				try {
 					const originalRef = await this._textModelService.createModelReference(entry.originalURI);
 					const modifiedRef = await this._textModelService.createModelReference(entry.modifiedURI);
 
 					try {
-						const diff = await this._editorWorkerService.computeDiff(
-							entry.originalURI,
-							entry.modifiedURI,
-							{ ignoreTrimWhitespace: true, computeMoves: false, maxComputationTimeMs: 2000 },
-							'advanced'
-						);
+						const originalVersion = originalRef.object.textEditorModel.getVersionId();
+						const modifiedVersion = modifiedRef.object.textEditorModel.getVersionId();
+
+						// Check cache first
+						const cacheKey = `${entry.entryId}-${originalVersion}-${modifiedVersion}`;
+						let cachedResult = this._summaryDiffCache.get(cacheKey);
+
+						// If cache miss, compute new diff
+						if (!cachedResult) {
+							const diffPromise = this._editorWorkerService.computeDiff(
+								entry.originalURI,
+								entry.modifiedURI,
+								{ ignoreTrimWhitespace: true, computeMoves: false, maxComputationTimeMs: 2000 },
+								'advanced'
+							).then(diff => ({
+								diff,
+								originalVersion,
+								modifiedVersion
+							}));
+
+							this._summaryDiffCache.set(cacheKey, diffPromise);
+							// Limit cache size to prevent memory issues
+							if (this._summaryDiffCache.size > 100) {
+								const firstKey = this._summaryDiffCache.keys().next().value;
+								if (firstKey !== undefined) {
+									this._summaryDiffCache.delete(firstKey);
+								}
+							}
+							cachedResult = diffPromise;
+						}
+
+						const { diff } = await cachedResult;
+
+						// Early bailout check after diff computation
+						if (!this._currentSession || this._cancellationTokenSource?.token.isCancellationRequested) {
+							return { linesAdded: 0, linesRemoved: 0 };
+						}
 
 						if (diff && diff.changes.length > 0) {
 							let fileLinesAdded = 0;
@@ -1215,6 +1263,13 @@ export class ComposerPanel extends ViewPane {
 			});
 
 			const fileStats = await Promise.all(statsPromises);
+
+			// Early bailout: Don't update stats if cancelled
+			if (!this._currentSession || this._cancellationTokenSource?.token.isCancellationRequested) {
+				isCancelled = true;
+				break;
+			}
+
 			for (const stats of fileStats) {
 				linesAdded += stats.linesAdded;
 				linesRemoved += stats.linesRemoved;
@@ -1226,12 +1281,15 @@ export class ComposerPanel extends ViewPane {
 			}
 		}
 
-		this._summaryStats.set({
-			filesChanged: entries.length,
-			linesAdded,
-			linesRemoved,
-			hunks
-		}, undefined);
+		// Only update stats if not cancelled and session still exists
+		if (!isCancelled && this._currentSession) {
+			this._summaryStats.set({
+				filesChanged: entries.length,
+				linesAdded,
+				linesRemoved,
+				hunks
+			}, undefined);
+		}
 	}
 
 	async generateProposals(): Promise<void> {

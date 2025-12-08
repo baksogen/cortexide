@@ -82,6 +82,10 @@ export class ChatEditingTextModelChangeService extends Disposable {
 	private _isExternalEditInProgress: (() => boolean) | undefined;
 	private _diffOperation: Promise<IDocumentDiff | undefined> | undefined;
 	private _diffOperationIds: number = 0;
+	// Debouncer for user edit diffs - prevents expensive diff computation on every keystroke
+	private readonly _userEditDiffDebouncer = this._register(new RunOnceScheduler(() => {
+		this._updateDiffInfoSeq(undefined, true);
+	}, 300)); // 300ms debounce - balances responsiveness with performance
 
 	private readonly _diffInfo = observableValue<IDocumentDiff>(this, nullDocumentDiff);
 	public get diffInfo() {
@@ -142,7 +146,7 @@ export class ChatEditingTextModelChangeService extends Disposable {
 		this._register(autorun(r => this.updateLineChangeCount(this._diffInfo.read(r))));
 
 		if (!originalModel.equalsTextBuffer(modifiedModel.getTextBuffer())) {
-			this._updateDiffInfoSeq();
+			this._updateDiffInfoSeq(undefined, true); // Immediate for initial diff
 		}
 	}
 
@@ -247,7 +251,7 @@ export class ChatEditingTextModelChangeService extends Disposable {
 		}
 
 		if (isLastEdits) {
-			this._updateDiffInfoSeq();
+			this._updateDiffInfoSeq(undefined, true); // Immediate for agent edits completion
 			this._editDecorationClear.schedule();
 		}
 
@@ -350,7 +354,7 @@ export class ChatEditingTextModelChangeService extends Disposable {
 			didChange = true;
 		}
 		if (didChange) {
-			await this._updateDiffInfoSeq();
+			await this._updateDiffInfoSeq(undefined, true); // Immediate for reset operations
 		}
 	}
 
@@ -363,7 +367,7 @@ export class ChatEditingTextModelChangeService extends Disposable {
 			const e_ai = edit;
 			this._originalToModifiedEdit = e_sum.compose(e_ai);
 			if (isExternalEdit) {
-				this._updateDiffInfoSeq();
+				this._updateDiffInfoSeq(undefined, true); // Immediate for external edits
 			}
 		} else {
 
@@ -397,6 +401,7 @@ export class ChatEditingTextModelChangeService extends Disposable {
 			}
 
 			this._allEditsAreFromUs = false;
+			// Debounced for user edits - will batch multiple keystrokes
 			this._updateDiffInfoSeq();
 			if (!this._didUserEditModelFired) {
 				this._didUserEditModelFired = true;
@@ -443,7 +448,18 @@ export class ChatEditingTextModelChangeService extends Disposable {
 	}
 
 
-	private async _updateDiffInfoSeq(notifyAction: 'accepted' | 'rejected' | undefined = undefined) {
+	private async _updateDiffInfoSeq(notifyAction: 'accepted' | 'rejected' | undefined = undefined, immediate: boolean = false) {
+		// For user edits, use debouncing unless immediate is requested
+		if (!immediate && notifyAction === undefined) {
+			this._userEditDiffDebouncer.schedule();
+			return;
+		}
+
+		// Cancel any pending debounced update when immediate is requested
+		if (immediate) {
+			this._userEditDiffDebouncer.cancel();
+		}
+
 		const myDiffOperationId = ++this._diffOperationIds;
 		await Promise.resolve(this._diffOperation);
 		const previousCount = this.lineChangeCount;

@@ -149,6 +149,12 @@ body.monaco-workbench {
 	box-shadow: var(--cortex-shadow-hairline);
 }
 
+/* On Windows, disable backdrop-filter on titlebar to avoid stacking context issues
+ * that prevent menubar dropdowns from appearing when appended to document.body */
+.monaco-workbench.windows .part.titlebar {
+	backdrop-filter: none;
+}
+
 .monaco-workbench .part.activitybar {
 	background: var(--cortex-surface-3) !important;
 	border-right: 1px solid var(--cortex-border-strong) !important;

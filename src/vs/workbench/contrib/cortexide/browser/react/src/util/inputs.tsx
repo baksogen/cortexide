@@ -15,7 +15,7 @@ import { useAccessor } from './services.js';
 import { ITextModel } from '../../../../../../../editor/common/model.js';
 import { asCssVariable } from '../../../../../../../platform/theme/common/colorUtils.js';
 import { inputBackground, inputForeground } from '../../../../../../../platform/theme/common/colorRegistry.js';
-import { useFloating, autoUpdate, offset, flip, shift, size, autoPlacement } from '@floating-ui/react';
+import { useFloating, autoUpdate, offset, flip, shift, size, autoPlacement, FloatingPortal } from '@floating-ui/react';
 import { URI } from '../../../../../../../base/common/uri.js';
 import { getBasename, getFolderName } from '../sidebar-tsx/SidebarChat.js';
 import { ChevronRight, File, Folder, FolderClosed, LucideProps } from 'lucide-react';
@@ -1275,22 +1275,22 @@ export const VoidSwitch = ({
 			${size === 'sm' ? 'h-5 w-9' : ''}
 			${size === 'sm+' ? 'h-5 w-10' : ''}
 			${size === 'md' ? 'h-6 w-11' : ''}
-		  `}
+		`}
 			>
 				<span
 					className={`
-			  inline-block transform rounded-full bg-white dark:bg-zinc-900 shadow transition-transform duration-200 ease-in-out
-			  ${size === 'xxs' ? 'h-2 w-2' : ''}
-			  ${size === 'xs' ? 'h-2.5 w-2.5' : ''}
-			  ${size === 'sm' ? 'h-3 w-3' : ''}
-			  ${size === 'sm+' ? 'h-3.5 w-3.5' : ''}
-			  ${size === 'md' ? 'h-4 w-4' : ''}
-			  ${size === 'xxs' ? (value ? 'translate-x-2.5' : 'translate-x-0.5') : ''}
-			  ${size === 'xs' ? (value ? 'translate-x-3.5' : 'translate-x-0.5') : ''}
-			  ${size === 'sm' ? (value ? 'translate-x-5' : 'translate-x-1') : ''}
-			  ${size === 'sm+' ? (value ? 'translate-x-6' : 'translate-x-1') : ''}
-			  ${size === 'md' ? (value ? 'translate-x-6' : 'translate-x-1') : ''}
-			`}
+						inline-block transform rounded-full bg-white dark:bg-zinc-900 shadow transition-transform duration-200 ease-in-out
+						${size === 'xxs' ? 'h-2 w-2' : ''}
+						${size === 'xs' ? 'h-2.5 w-2.5' : ''}
+						${size === 'sm' ? 'h-3 w-3' : ''}
+						${size === 'sm+' ? 'h-3.5 w-3.5' : ''}
+						${size === 'md' ? 'h-4 w-4' : ''}
+						${size === 'xxs' ? (value ? 'translate-x-2.5' : 'translate-x-0.5') : ''}
+						${size === 'xs' ? (value ? 'translate-x-3.5' : 'translate-x-0.5') : ''}
+						${size === 'sm' ? (value ? 'translate-x-5' : 'translate-x-1') : ''}
+						${size === 'sm+' ? (value ? 'translate-x-6' : 'translate-x-1') : ''}
+						${size === 'md' ? (value ? 'translate-x-6' : 'translate-x-1') : ''}
+					`}
 				/>
 			</div>
 		</label>
@@ -1497,64 +1497,68 @@ export const VoidCustomDropdownBox = <T extends NonNullable<any>>({
 			</button>
 
 			{/* Dropdown Menu */}
+			{/* On Windows, use FloatingPortal to append dropdown to document.body to avoid stacking context issues
+				where the dropdown renders behind the workbench content, similar to VSCode's menubar implementation */}
 			{isOpen && (
-				<div
-					ref={refs.setFloating}
-					className="z-[100] bg-void-bg-1 border-void-border-3 border rounded shadow-lg"
-					style={{
-						position: strategy,
-						top: y ?? 0,
-						left: x ?? 0,
-						width: (matchInputWidth
-							? (refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0)
-							: Math.max(
-								(refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0),
-								(measureRef.current instanceof HTMLElement ? measureRef.current.offsetWidth : 0)
-							))
-					}}
-					onWheel={(e) => e.stopPropagation()}
-				><div className='overflow-auto max-h-80'>
+				<FloatingPortal>
+					<div
+						ref={refs.setFloating}
+						className="z-[100] bg-void-bg-1 border-void-border-3 border rounded shadow-lg"
+						style={{
+							position: strategy,
+							top: y ?? 0,
+							left: x ?? 0,
+							width: (matchInputWidth
+								? (refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0)
+								: Math.max(
+									(refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0),
+									(measureRef.current instanceof HTMLElement ? measureRef.current.offsetWidth : 0)
+								))
+						}}
+						onWheel={(e) => e.stopPropagation()}
+					><div className='overflow-auto max-h-80'>
 
-						{options.map((option) => {
-							const thisOptionIsSelected = getOptionsEqual(option, selectedOption);
-							const optionName = getOptionDropdownName(option);
-							const optionDetail = getOptionDropdownDetail?.(option) || '';
+							{options.map((option) => {
+								const thisOptionIsSelected = getOptionsEqual(option, selectedOption);
+								const optionName = getOptionDropdownName(option);
+								const optionDetail = getOptionDropdownDetail?.(option) || '';
 
-							return (
-								<div
-									key={optionName}
-									className={`flex items-center px-2 py-1 pr-4 cursor-pointer whitespace-nowrap
-									transition-all duration-100
-									${thisOptionIsSelected ? 'bg-blue-500 text-white/80' : 'hover:bg-blue-500 hover:text-white/80'}
-								`}
-									onClick={() => {
-										onChangeOption(option);
-										setIsOpen(false);
-									}}
-								>
-									<div className="w-4 flex justify-center flex-shrink-0">
-										{thisOptionIsSelected && (
-											<svg className="size-3" viewBox="0 0 12 12" fill="none">
-												<path
-													d="M10 3L4.5 8.5L2 6"
-													stroke="currentColor"
-													strokeWidth="1.5"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-												/>
-											</svg>
-										)}
+								return (
+									<div
+										key={optionName}
+										className={`flex items-center px-2 py-1 pr-4 cursor-pointer whitespace-nowrap
+										transition-all duration-100
+										${thisOptionIsSelected ? 'bg-blue-500 text-white/80' : 'hover:bg-blue-500 hover:text-white/80'}
+									`}
+										onClick={() => {
+											onChangeOption(option);
+											setIsOpen(false);
+										}}
+									>
+										<div className="w-4 flex justify-center flex-shrink-0">
+											{thisOptionIsSelected && (
+												<svg className="size-3" viewBox="0 0 12 12" fill="none">
+													<path
+														d="M10 3L4.5 8.5L2 6"
+														stroke="currentColor"
+														strokeWidth="1.5"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+												</svg>
+											)}
+										</div>
+										<span className="flex justify-between items-center w-full gap-x-1">
+											<span>{optionName}</span>
+											<span className='opacity-60'>{optionDetail}</span>
+										</span>
 									</div>
-									<span className="flex justify-between items-center w-full gap-x-1">
-										<span>{optionName}</span>
-										<span className='opacity-60'>{optionDetail}</span>
-									</span>
-								</div>
-							);
-						})}
-					</div>
+								);
+							})}
+						</div>
 
-				</div>
+					</div>
+				</FloatingPortal>
 			)}
 		</div>
 	);
@@ -2067,11 +2071,11 @@ export const VoidDiffEditor = ({ uri, searchReplaceBlocks, language }: { uri?: a
 		<div className="w-full flex flex-col gap-2">
 			{blocks.map((block, index) => (
 				<div key={index} className="w-full">
-                    {blocks.length > 1 && (
-                        <div className="text-void-fg-4 text-xs mb-1 px-1 void-diff-block-header">
-                            Change {index + 1} of {blocks.length}
-                        </div>
-                    )}
+					{blocks.length > 1 && (
+						<div className="text-void-fg-4 text-xs mb-1 px-1 void-diff-block-header">
+							Change {index + 1} of {blocks.length}
+						</div>
+					)}
 					<SingleDiffEditor block={block} lang={lang} />
 				</div>
 			))}

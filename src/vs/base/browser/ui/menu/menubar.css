@@ -116,6 +116,8 @@ body > .menubar-menu-items-holder.monaco-menu-container {
 	transform: none !important;
 	/* Prevent any stacking context issues */
 	isolation: auto;
+	/* Ensure menu appears above all workbench content including titlebar with backdrop-filter */
+	will-change: auto;
 }
 
 .menubar .toolbar-toggle-more {

@@ -677,11 +677,22 @@ export class MenuBar extends Disposable {
 			return;
 		}
 
+		// CRITICAL FIX: Validate state machine integrity before allowing OPEN state
+		// If transitioning to OPEN, focusedMenu MUST be set. This prevents the bug where
+		// focusState is OPEN but focusedMenu is undefined, causing crashes when accessing
+		// this.focusedMenu.index in showCustomMenu.
+		if (value === MenubarState.OPEN && !this.focusedMenu) {
+			// State machine integrity violation: cannot open menu without focusedMenu
+			// This should never happen if all code paths set focusedMenu before setting focusState to OPEN
+			// However, as a defensive measure, we'll log and prevent the invalid state transition
+			console.warn('MenuBar: Attempted to set focusState to OPEN without focusedMenu. This indicates a state machine bug.');
+			// Don't allow the invalid state transition - return early
+			return;
+		}
+
 		const isVisible = this.isVisible;
 		const isOpen = this.isOpen;
 		const isFocused = this.isFocused;
-
-		this._focusState = value;
 
 		switch (value) {
 			case MenubarState.HIDDEN:
@@ -759,13 +770,23 @@ export class MenuBar extends Disposable {
 					this.showMenubar();
 				}
 
-				if (this.focusedMenu) {
-					this.cleanupCustomMenu();
-					this.showCustomMenu(this.focusedMenu.index, this.openedViaKeyboard);
+				// CRITICAL FIX: At this point, focusedMenu is guaranteed to be set due to validation above
+				// However, add an additional defensive check as a safety net (defense in depth)
+				if (!this.focusedMenu) {
+					console.error('MenuBar: focusState set to OPEN but focusedMenu is undefined. This should be impossible after validation.');
+					// Reset to FOCUSED state to maintain state machine integrity
+					// Don't set _focusState to OPEN, keep it at current state
+					this._focusState = this._focusState; // Keep current state
+					return;
 				}
+
+				this.cleanupCustomMenu();
+				this.showCustomMenu(this.focusedMenu.index, this.openedViaKeyboard);
 				break;
 		}
 
+		// Set the state AFTER all switch cases have been processed
+		// This ensures state is only updated if all validations pass
 		this._focusState = value;
 		this._onFocusStateChange.fire(this.focusState >= MenubarState.FOCUSED);
 	}

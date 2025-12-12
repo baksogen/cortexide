@@ -1430,17 +1430,28 @@ export const VoidCustomDropdownBox = <T extends NonNullable<any>>({
 			// Check if reference is an HTML element before using contains
 			const isReferenceHTMLElement = reference && 'contains' in reference;
 
+			// Don't close if clicking inside the floating dropdown or its reference button
 			if (
 				floating &&
-				(!isReferenceHTMLElement || !reference.contains(target)) &&
-				!floating.contains(target)
+				floating.contains(target)
 			) {
-				setIsOpen(false);
+				return; // Click is inside dropdown, don't close
 			}
+
+			if (
+				isReferenceHTMLElement &&
+				reference.contains(target)
+			) {
+				return; // Click is on the reference button, don't close (button's onClick will handle toggle)
+			}
+
+			// Click is outside both, close the dropdown
+			setIsOpen(false);
 		};
 
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
+		// Use capture phase to catch events early, but stopPropagation on dropdown items prevents interference
+		document.addEventListener('mousedown', handleClickOutside, true);
+		return () => document.removeEventListener('mousedown', handleClickOutside, true);
 	}, [isOpen, refs.floating, refs.reference]);
 
 	if (selectedOption === undefined)
@@ -1503,7 +1514,7 @@ export const VoidCustomDropdownBox = <T extends NonNullable<any>>({
 				<FloatingPortal>
 					<div
 						ref={refs.setFloating}
-						className="z-[100] bg-void-bg-1 border-void-border-3 border rounded shadow-lg"
+						className="z-[10000] bg-void-bg-1 border-void-border-3 border rounded shadow-lg"
 						style={{
 							position: strategy,
 							top: y ?? 0,
@@ -1516,6 +1527,7 @@ export const VoidCustomDropdownBox = <T extends NonNullable<any>>({
 								))
 						}}
 						onWheel={(e) => e.stopPropagation()}
+						onMouseDown={(e) => e.stopPropagation()}
 					><div className='overflow-auto max-h-80'>
 
 							{options.map((option) => {
@@ -1530,7 +1542,11 @@ export const VoidCustomDropdownBox = <T extends NonNullable<any>>({
 										transition-all duration-100
 										${thisOptionIsSelected ? 'bg-blue-500 text-white/80' : 'hover:bg-blue-500 hover:text-white/80'}
 									`}
-										onClick={() => {
+										onMouseDown={(e) => {
+											e.stopPropagation();
+										}}
+										onClick={(e) => {
+											e.stopPropagation();
 											onChangeOption(option);
 											setIsOpen(false);
 										}}

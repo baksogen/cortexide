@@ -136,7 +136,11 @@ body > .menubar-menu-items-holder.monaco-menu-container {
 
 /* Menu scrollable element - main container styling */
 body > .menubar-menu-items-holder.monaco-menu-container .monaco-scrollable-element {
-	/* Ensure proper height calculation - let content determine height */
+	/* Enable scrolling when content overflows */
+	max-height: calc(100vh - 100px) !important; /* Leave space for menu bar and padding */
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	/* Ensure proper height calculation - let content determine height up to max */
 	height: auto !important;
 	min-height: fit-content !important;
 	/* Modern background with color-mix like Quick Input */
@@ -148,6 +152,28 @@ body > .menubar-menu-items-holder.monaco-menu-container .monaco-scrollable-eleme
 	font-family: "Segoe WPC", "Segoe UI", sans-serif !important;
 	/* Remove default outline, use border instead */
 	outline: none !important;
+	/* Smooth scrolling */
+	scroll-behavior: smooth !important;
+}
+
+/* Custom scrollbar styling to match theme */
+body > .menubar-menu-items-holder.monaco-menu-container .monaco-scrollable-element::-webkit-scrollbar {
+	width: 8px !important;
+}
+
+body > .menubar-menu-items-holder.monaco-menu-container .monaco-scrollable-element::-webkit-scrollbar-track {
+	background: transparent !important;
+	border-radius: 4px !important;
+}
+
+body > .menubar-menu-items-holder.monaco-menu-container .monaco-scrollable-element::-webkit-scrollbar-thumb {
+	background: color-mix(in srgb, var(--cortex-border-strong, #1f1f1f) 60%, transparent) !important;
+	border-radius: 4px !important;
+	border: 1px solid transparent !important;
+}
+
+body > .menubar-menu-items-holder.monaco-menu-container .monaco-scrollable-element::-webkit-scrollbar-thumb:hover {
+	background: color-mix(in srgb, var(--cortex-border-strong, #1f1f1f) 80%, transparent) !important;
 }
 
 body > .menubar-menu-items-holder.monaco-menu-container .monaco-menu {

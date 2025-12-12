@@ -15,7 +15,7 @@ import { useAccessor } from './services.js';
 import { ITextModel } from '../../../../../../../editor/common/model.js';
 import { asCssVariable } from '../../../../../../../platform/theme/common/colorUtils.js';
 import { inputBackground, inputForeground } from '../../../../../../../platform/theme/common/colorRegistry.js';
-import { useFloating, autoUpdate, offset, flip, shift, size, autoPlacement, FloatingPortal } from '@floating-ui/react';
+import { useFloating, autoUpdate, offset, flip, shift, size, autoPlacement } from '@floating-ui/react';
 import { URI } from '../../../../../../../base/common/uri.js';
 import { getBasename, getFolderName } from '../sidebar-tsx/SidebarChat.js';
 import { ChevronRight, File, Folder, FolderClosed, LucideProps } from 'lucide-react';
@@ -1430,28 +1430,17 @@ export const VoidCustomDropdownBox = <T extends NonNullable<any>>({
 			// Check if reference is an HTML element before using contains
 			const isReferenceHTMLElement = reference && 'contains' in reference;
 
-			// Don't close if clicking inside the floating dropdown or its reference button
 			if (
 				floating &&
-				floating.contains(target)
+				(!isReferenceHTMLElement || !reference.contains(target)) &&
+				!floating.contains(target)
 			) {
-				return; // Click is inside dropdown, don't close
+				setIsOpen(false);
 			}
-
-			if (
-				isReferenceHTMLElement &&
-				reference.contains(target)
-			) {
-				return; // Click is on the reference button, don't close (button's onClick will handle toggle)
-			}
-
-			// Click is outside both, close the dropdown
-			setIsOpen(false);
 		};
 
-		// Use capture phase to catch events early, but stopPropagation on dropdown items prevents interference
-		document.addEventListener('mousedown', handleClickOutside, true);
-		return () => document.removeEventListener('mousedown', handleClickOutside, true);
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [isOpen, refs.floating, refs.reference]);
 
 	if (selectedOption === undefined)
@@ -1508,73 +1497,64 @@ export const VoidCustomDropdownBox = <T extends NonNullable<any>>({
 			</button>
 
 			{/* Dropdown Menu */}
-			{/* On Windows, use FloatingPortal to append dropdown to document.body to avoid stacking context issues
-				where the dropdown renders behind the workbench content, similar to VSCode's menubar implementation */}
 			{isOpen && (
-				<FloatingPortal>
-					<div
-						ref={refs.setFloating}
-						className="z-[10000] bg-void-bg-1 border-void-border-3 border rounded shadow-lg"
-						style={{
-							position: strategy,
-							top: y ?? 0,
-							left: x ?? 0,
-							width: (matchInputWidth
-								? (refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0)
-								: Math.max(
-									(refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0),
-									(measureRef.current instanceof HTMLElement ? measureRef.current.offsetWidth : 0)
-								))
-						}}
-						onWheel={(e) => e.stopPropagation()}
-						onMouseDown={(e) => e.stopPropagation()}
-					><div className='overflow-auto max-h-80'>
+				<div
+					ref={refs.setFloating}
+					className="z-[10000] bg-void-bg-1 border-void-border-3 border rounded shadow-lg"
+					style={{
+						position: strategy,
+						top: y ?? 0,
+						left: x ?? 0,
+						width: (matchInputWidth
+							? (refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0)
+							: Math.max(
+								(refs.reference.current instanceof HTMLElement ? refs.reference.current.offsetWidth : 0),
+								(measureRef.current instanceof HTMLElement ? measureRef.current.offsetWidth : 0)
+							))
+					}}
+					onWheel={(e) => e.stopPropagation()}
+				><div className='overflow-auto max-h-80'>
 
-							{options.map((option) => {
-								const thisOptionIsSelected = getOptionsEqual(option, selectedOption);
-								const optionName = getOptionDropdownName(option);
-								const optionDetail = getOptionDropdownDetail?.(option) || '';
+						{options.map((option) => {
+							const thisOptionIsSelected = getOptionsEqual(option, selectedOption);
+							const optionName = getOptionDropdownName(option);
+							const optionDetail = getOptionDropdownDetail?.(option) || '';
 
-								return (
-									<div
-										key={optionName}
-										className={`flex items-center px-2 py-1 pr-4 cursor-pointer whitespace-nowrap
-										transition-all duration-100
-										${thisOptionIsSelected ? 'bg-blue-500 text-white/80' : 'hover:bg-blue-500 hover:text-white/80'}
-									`}
-										onMouseDown={(e) => {
-											e.stopPropagation();
-										}}
-										onClick={(e) => {
-											e.stopPropagation();
-											onChangeOption(option);
-											setIsOpen(false);
-										}}
-									>
-										<div className="w-4 flex justify-center flex-shrink-0">
-											{thisOptionIsSelected && (
-												<svg className="size-3" viewBox="0 0 12 12" fill="none">
-													<path
-														d="M10 3L4.5 8.5L2 6"
-														stroke="currentColor"
-														strokeWidth="1.5"
-														strokeLinecap="round"
-														strokeLinejoin="round"
-													/>
-												</svg>
-											)}
-										</div>
-										<span className="flex justify-between items-center w-full gap-x-1">
-											<span>{optionName}</span>
-											<span className='opacity-60'>{optionDetail}</span>
-										</span>
+							return (
+								<div
+									key={optionName}
+									className={`flex items-center px-2 py-1 pr-4 cursor-pointer whitespace-nowrap
+									transition-all duration-100
+									${thisOptionIsSelected ? 'bg-blue-500 text-white/80' : 'hover:bg-blue-500 hover:text-white/80'}
+								`}
+									onClick={() => {
+										onChangeOption(option);
+										setIsOpen(false);
+									}}
+								>
+									<div className="w-4 flex justify-center flex-shrink-0">
+										{thisOptionIsSelected && (
+											<svg className="size-3" viewBox="0 0 12 12" fill="none">
+												<path
+													d="M10 3L4.5 8.5L2 6"
+													stroke="currentColor"
+													strokeWidth="1.5"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												/>
+											</svg>
+										)}
 									</div>
-								);
-							})}
-						</div>
-
+									<span className="flex justify-between items-center w-full gap-x-1">
+										<span>{optionName}</span>
+										<span className='opacity-60'>{optionDetail}</span>
+									</span>
+								</div>
+							);
+						})}
 					</div>
-				</FloatingPortal>
+
+				</div>
 			)}
 		</div>
 	);

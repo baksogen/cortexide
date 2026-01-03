@@ -794,28 +794,7 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 	 * Get a fallback model when auto selection fails
 	 * Returns the first available configured model, or null if none are available
 	 */
-	private _getFallbackModel(): ModelSelection | null {
-		const settingsState = this._settingsService.state;
-
-		// Try to find any configured model (prefer online models first, then local)
-		const providerNames: ProviderName[] = ['anthropic', 'openAI', 'gemini', 'xAI', 'mistral', 'deepseek', 'groq', 'ollama', 'vLLM', 'lmStudio', 'openAICompatible', 'openRouter', 'liteLLM'];
-
-		for (const providerName of providerNames) {
-			const providerSettings = settingsState.settingsOfProvider[providerName];
-			if (providerSettings && providerSettings._didFillInProviderSettings) {
-				// Find first non-hidden model
-				const firstModel = providerSettings.models.find(m => !m.isHidden);
-				if (firstModel) {
-					return {
-						providerName,
-						modelName: firstModel.modelName,
-					};
-				}
-			}
-		}
-
-		return null;
-	}
+	// Note: _getFallbackModel removed - use _settingsService.resolveAutoModelSelection() instead
 
 	/**
 	 * Check if a model supports vision/image inputs
@@ -2558,6 +2537,26 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 		repoIndexerPromise?: Promise<{ results: string[], metrics: any } | null>,
 	}) {
 
+		// CRITICAL: Validate and resolve model selection BEFORE starting the loop
+		// This prevents wasted API calls and ensures we have a valid model
+		let resolvedModelSelection = modelSelection
+		let resolvedModelSelectionOptions = modelSelectionOptions
+
+		// Resolve "auto" model selection using shared utility
+		const resolved = this._settingsService.resolveAutoModelSelection(resolvedModelSelection)
+		if (!resolved) {
+			// No models available
+			this._notificationService.error('No models available. Please configure at least one model provider in settings.')
+			this._setStreamState(threadId, { isRunning: 'idle', interrupt: 'not_needed' })
+			return
+		}
+		resolvedModelSelection = resolved
+
+		// Recompute modelSelectionOptions for the resolved model
+		// Type assertion is safe because we've already resolved "auto" above
+		const resolvedProviderName = resolvedModelSelection.providerName as Exclude<typeof resolvedModelSelection.providerName, 'auto'>
+		resolvedModelSelectionOptions = this._settingsService.state.optionsOfModelSelection['Chat']?.[resolvedProviderName]?.[resolvedModelSelection.modelName]
+
 		// CRITICAL: Create a flag to stop execution immediately when plan is generated
 		// NOTE: This flag is reset when plan is approved/executing to allow execution to proceed
 		let planWasGenerated = false
@@ -2743,6 +2742,8 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 
 		// Flag to prevent further tool calls after file read limit is exceeded
 		let fileReadLimitExceeded = false
+		// Track tools executed in this request to detect incomplete workflows
+		let toolsExecutedInRequest: string[] = []
 
 		// tool use loop
 		while (shouldSendAnotherMessage) {
@@ -2803,7 +2804,7 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 					const preprocessed = await preprocessImagesForQA(
 						originalUserMessage.images,
 						originalUserMessage.displayContent || '',
-						modelSelection,
+						resolvedModelSelection,
 						settings.imageQADevMode,
 						{
 							allowRemoteModels: settings.imageQAAllowRemoteModels,
@@ -2851,23 +2852,10 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 				return
 			}
 
-			// CRITICAL: Validate modelSelection before preparing messages
-			// This prevents "invalid message format" errors from empty messages
-			// If auto selection failed and returned unresolved 'auto', try fallback
-			if (!modelSelection || (modelSelection.providerName === 'auto' && modelSelection.modelName === 'auto')) {
-				// Try to get fallback model instead of erroring
-				const fallbackModel = this._getFallbackModel()
-				if (fallbackModel) {
-					modelSelection = fallbackModel
-					// Only log to console to avoid notification spam - fallback should work transparently
-					console.debug('[ChatThreadService] Auto model selection failed, using fallback model:', fallbackModel)
-				} else {
-					// Last resort: no models available
-					this._notificationService.error('No models available. Please configure at least one model provider in settings.')
-					this._setStreamState(threadId, { isRunning: 'idle', interrupt: 'not_needed' })
-					return
-				}
-			}
+			// Use resolved model selection (already validated before loop)
+			// Use let so we can update it in retry logic
+			let modelSelection = resolvedModelSelection
+			let modelSelectionOptions = resolvedModelSelectionOptions
 
 			// Start latency audit tracking (reuse earlyRequestId if provided for router tracking, otherwise generate new)
 			const finalRequestId = earlyRequestId || generateUuid()
@@ -3342,7 +3330,8 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 						let nextModel: ModelSelection | null = null
 						if (originalRoutingDecision?.fallbackChain && originalRoutingDecision.fallbackChain.length > 0) {
 							// Find first model in fallback chain that we haven't tried
-							for (const fallbackModel of originalRoutingDecision.fallbackChain) {
+							const fallbackChain: ModelSelection[] = originalRoutingDecision.fallbackChain
+							for (const fallbackModel of fallbackChain) {
 								const modelKey = `${fallbackModel.providerName}/${fallbackModel.modelName}`
 								if (!triedModels.has(modelKey)) {
 									nextModel = fallbackModel
@@ -3420,6 +3409,11 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 							} else {
 								console.log(`[ChatThreadService] Auto mode: Model ${modelSelection?.providerName}/${modelSelection?.modelName} failed, trying fallback: ${nextModel.providerName}/${nextModel.modelName}`)
 								modelSelection = nextModel
+								// Update resolvedModelSelection and options for next iteration
+								resolvedModelSelection = nextModel
+								// Type assertion is safe because nextModel is not "auto" (it came from fallback chain)
+								const nextProviderName = nextModel.providerName as Exclude<typeof nextModel.providerName, 'auto'>
+								resolvedModelSelectionOptions = this._settingsService.state.optionsOfModelSelection['Chat']?.[nextProviderName]?.[nextModel.modelName]
 								// Update request ID for new model
 								const newRequestId = generateUuid()
 								chatLatencyAudit.startRequest(newRequestId, nextModel.providerName, nextModel.modelName)
@@ -3650,14 +3644,109 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 				// This prevents the UI from continuing to show streaming state after completion
 				this._setStreamState(threadId, { isRunning: 'idle', interrupt: 'not_needed' })
 
-				// CRITICAL: If we've synthesized tools and model responded without tools, stop the loop
-				// This prevents infinite loops when models don't support tools
-				// The model has given its final answer, no need to continue
+				// CRITICAL: Check if model responded with text but no tool call after executing tools
+				// This can happen when model explores codebase but doesn't continue to answer the question
+				// For "how many endpoints" type questions, we need to ensure model searches for endpoints
+				if (!toolCall && info.fullText.trim() && toolsExecutedInRequest.length > 0 && originalUserMessage) {
+					const userRequest = originalUserMessage.displayContent?.toLowerCase() || ''
+
+					// Check if this is a "how many" question that requires searching files
+					// Expanded pattern matching for better detection
+					const isHowManyQuestion = userRequest.includes('how many') && (
+						userRequest.includes('endpoint') || userRequest.includes('api') || userRequest.includes('route') ||
+						userRequest.includes('file') || userRequest.includes('function') || userRequest.includes('class') ||
+						userRequest.includes('method') || userRequest.includes('component') || userRequest.includes('module') ||
+						userRequest.includes('service') || userRequest.includes('controller') || userRequest.includes('handler')
+					)
+
+					// Check if we've searched or read files (needed to determine if more search is needed)
+					const hasSearched = toolsExecutedInRequest.includes('search_for_files') || toolsExecutedInRequest.includes('search_pathnames_only')
+					const hasRead = toolsExecutedInRequest.includes('read_file')
+
+					// Check if model's response actually contains an answer (has numbers or count indicators)
+					const responseText = info.fullText.toLowerCase()
+					const hasCountInResponse = /\d+/.test(responseText) && (
+						responseText.includes('endpoint') || responseText.includes('api') || responseText.includes('route') ||
+						responseText.includes('file') || responseText.includes('function') || responseText.includes('class') ||
+						responseText.includes('there are') || responseText.includes('i found') || responseText.includes('total')
+					)
+
+					// If it's a "how many" question and we haven't searched/read, and response doesn't contain answer, synthesize search
+					const needsMoreSearch = isHowManyQuestion && !hasSearched && !hasRead && !hasCountInResponse && !hasSynthesizedForRequest && filesReadInQuery < MAX_FILES_READ_PER_QUERY
+
+					if (needsMoreSearch) {
+						const synthesizedToolCall = this._synthesizeToolCallFromIntent(userRequest, originalUserMessage.displayContent || '')
+						if (synthesizedToolCall && synthesizedToolCall.toolName === 'search_for_files') {
+							const { toolName, toolParams } = synthesizedToolCall
+							const toolId = generateUuid()
+
+							// Add assistant message explaining we're continuing the search
+							this._addMessageToThread(threadId, {
+								role: 'assistant',
+								displayContent: `I'll search for files to answer your question.`,
+								reasoning: '',
+								anthropicReasoning: null
+							})
+
+							// Execute the synthesized tool
+							const mcpTools = this._mcpService.getMCPTools()
+							const mcpTool = mcpTools?.find(t => t.name === toolName as ToolName)
+							const { awaitingUserApproval, interrupted } = await this._runToolCall(
+								threadId,
+								toolName as ToolName,
+								toolId,
+								mcpTool?.mcpServerName,
+								{ preapproved: false, unvalidatedToolParams: toolParams }
+							)
+
+							if (interrupted) {
+								this._setStreamState(threadId, undefined)
+								return
+							}
+
+							(toolsExecutedInRequest as string[]).push(toolName)
+							hasSynthesizedToolsInThisRequest = true
+
+							if (awaitingUserApproval) {
+								isRunningWhenEnd = 'awaiting_user'
+							} else {
+								shouldSendAnotherMessage = true
+							}
+
+							this._setStreamState(threadId, { isRunning: 'idle', interrupt: 'not_needed' })
+							continue // Continue loop with the new tool result
+						}
+					}
+				}
+
+				// CRITICAL: Only stop loop if tools were synthesized AND model explicitly indicates task is complete
+				// Don't stop just because tools were synthesized - model might need another iteration
+				// Only stop if model's response clearly indicates completion AND no more tools needed
 				if (hasSynthesizedToolsInThisRequest && !toolCall && info.fullText.trim()) {
-					// Model doesn't support tools or chose not to use them - stop here
-					// Set to undefined to properly clear the state and hide the stop button
-					this._setStreamState(threadId, { isRunning: undefined })
-					return
+					// Check if model's response indicates the task is actually complete
+					const responseText = info.fullText.toLowerCase()
+					const indicatesCompletion =
+						responseText.includes('i cannot') ||
+						responseText.includes('i don\'t have') ||
+						responseText.includes('i\'m unable') ||
+						responseText.includes('i need more information') ||
+						responseText.includes('please provide') ||
+						// If we've executed multiple tools and model gives a clear answer, it's likely complete
+						(toolsExecutedInRequest.length >= 3 && (
+							responseText.includes('here') ||
+							responseText.includes('found') ||
+							responseText.includes('result') ||
+							responseText.includes('answer')
+						))
+
+					// Only stop if model explicitly indicates completion or we've done substantial work
+					// Don't stop if model just responded with text after first tool synthesis
+					if (indicatesCompletion || (toolsExecutedInRequest.length >= 3 && !originalUserMessage?.displayContent?.toLowerCase().includes('how many'))) {
+						// Model has given its final answer - stop here
+						this._setStreamState(threadId, { isRunning: undefined })
+						return
+					}
+					// Otherwise, continue loop to give model another chance to use tools or complete the task
 				}
 
 				// call tool if there is one
@@ -3671,14 +3760,14 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 
 					// CRITICAL: Prevent excessive file reads that can cause infinite loops
 					// For codebase queries, limit the number of files read
+					// Check limit BEFORE incrementing to ensure we don't exceed it
 					if (toolCall.name === 'read_file') {
-						filesReadInQuery++
-						if (filesReadInQuery > MAX_FILES_READ_PER_QUERY) {
+						if (filesReadInQuery >= MAX_FILES_READ_PER_QUERY) {
 							// Too many files read - likely stuck in a loop
 							// Add a message explaining the limit, then make one final LLM call to generate an answer
 							this._addMessageToThread(threadId, {
 								role: 'assistant',
-								displayContent: `I've read ${filesReadInQuery} files, which exceeds the limit. I'll provide an answer based on what I've gathered so far.`,
+								displayContent: `I've read ${filesReadInQuery} files, which is the limit. I'll provide an answer based on what I've gathered so far.`,
 								reasoning: '',
 								anthropicReasoning: null
 							})
@@ -3696,6 +3785,8 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 							// Skip tool execution and continue to next LLM call
 							continue
 						}
+						// Only increment if we're actually going to read the file
+						filesReadInQuery++
 					}
 
 					// CRITICAL: Check for pending plan before executing tool (fast check)
@@ -3721,6 +3812,11 @@ Output ONLY the JSON, no other text. Start with { and end with }.`
 						}
 						return
 					}
+
+					// Track that this tool was executed (even if it failed - we still tried)
+					// Tool errors are handled by _runToolCall which adds error messages to the thread
+					// The loop will continue so the model can process the error
+					toolsExecutedInRequest.push(toolCall.name)
 
 					// Only update plan step status if we have an active plan (skip if no plan)
 					if (activePlanTracking?.currentStep) {
@@ -4439,8 +4535,8 @@ We only need to do it for files that were edited since `from`, ie files between 
 			// CRITICAL: If auto selection failed, we need a fallback to prevent null modelSelection
 			// This ensures we never send empty messages to the API (which causes "invalid message format" error)
 			if (!modelSelection) {
-				// Try to get any available model as fallback
-				const fallbackModel = this._getFallbackModel()
+				// Try to get any available model as fallback using shared utility
+				const fallbackModel = this._settingsService.resolveAutoModelSelection(null)
 				if (fallbackModel) {
 					modelSelection = fallbackModel
 					this._notificationService.warn('Auto model selection failed. Using fallback model. Please configure your model providers.')

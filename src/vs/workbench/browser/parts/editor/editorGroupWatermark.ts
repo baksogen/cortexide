@@ -453,6 +453,8 @@ export class EditorGroupWatermark extends Disposable {
 	private clear(): void {
 		clearNode(this.shortcuts);
 		this.transientDisposables.clear();
+		this.currentDisposables.forEach(label => label.dispose());
+		this.currentDisposables.clear();
 	}
 
 	override dispose(): void {

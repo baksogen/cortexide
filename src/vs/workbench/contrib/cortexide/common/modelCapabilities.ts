@@ -85,6 +85,9 @@ export const defaultProviderSettings = {
 		region: 'us-east-1', // add region setting
 		endpoint: '', // optionally allow overriding default
 	},
+	minimax: {
+		apiKey: '',
+	},
 
 } as const
 
@@ -277,6 +280,19 @@ export const defaultModelsOfProvider = {
 	microsoftAzure: [],
 	awsBedrock: [],
 	liteLLM: [],
+	minimax: [
+		// https://platform.minimax.io/docs/guides/text-ai-coding-tools
+		// NOTE: Keep this list in sync with Minimax's current models.
+		// Reference: https://platform.minimax.io/docs/api/text/chat (checked 2025-01-09)
+		'MiniMax-M2.1', // Latest M2.1 model with strong reasoning and coding capabilities
+		'MiniMax-Text-01', // Latest reasoning model with strong coding capabilities
+		'MiniMax-Text-01-preview', // Preview version of MiniMax-Text-01
+		'abab6.5s-chat', // Fast model for real-time applications
+		'abab6.5-chat', // Balanced model for general tasks
+		'abab6-chat', // Previous generation model
+		'abab5.5s-chat', // Fast variant of abab5.5
+		'abab5.5-chat', // Previous balanced model
+	],
 
 
 } as const satisfies Record<ProviderName, string[]>
@@ -1529,6 +1545,118 @@ const awsBedrockSettings: VoidStaticProviderInfo = {
 }
 
 
+// ---------------- MINIMAX ----------------
+// https://platform.minimax.io/docs/guides/text-ai-coding-tools
+const minimaxModelOptions = {
+	'MiniMax-Text-01': {
+		contextWindow: 1_000_000, // 1M tokens context (max)
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: {
+			supportsReasoning: true,
+			canTurnOffReasoning: true,
+			canIOReasoning: true,
+			reasoningReservedOutputTokenSpace: 8_192,
+			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
+		},
+	},
+	'MiniMax-Text-01-preview': {
+		contextWindow: 1_000_000,
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: {
+			supportsReasoning: true,
+			canTurnOffReasoning: true,
+			canIOReasoning: true,
+			reasoningReservedOutputTokenSpace: 8_192,
+			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
+		},
+	},
+	'MiniMax-M2.1': {
+		contextWindow: 1_000_000,
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: {
+			supportsReasoning: true,
+			canTurnOffReasoning: true,
+			canIOReasoning: true,
+			reasoningReservedOutputTokenSpace: 8_192,
+			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
+		},
+	},
+	'abab6.5s-chat': {
+		contextWindow: 200_000,
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: false,
+	},
+	'abab6.5-chat': {
+		contextWindow: 200_000,
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: false,
+	},
+	'abab6-chat': {
+		contextWindow: 200_000,
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: false,
+	},
+	'abab5.5s-chat': {
+		contextWindow: 200_000,
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: false,
+	},
+	'abab5.5-chat': {
+		contextWindow: 200_000,
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: false,
+	},
+} as const satisfies Record<string, CortexideStaticModelInfo>
+
+const minimaxSettings: VoidStaticProviderInfo = {
+	modelOptions: minimaxModelOptions,
+	modelOptionsFallback: (modelName) => { return null },
+	providerReasoningIOSettings: {
+		input: { includeInPayload: openAICompatIncludeInPayloadReasoning },
+	},
+}
+
+
 // ---------------- VLLM, OLLAMA, OPENAICOMPAT (self-hosted / local) ----------------
 const ollamaModelOptions = {
 	'qwen2.5-coder:7b': {
@@ -1931,6 +2059,7 @@ const modelSettingsOfProvider: { [providerName in ProviderName]: VoidStaticProvi
 	googleVertex: googleVertexSettings,
 	microsoftAzure: microsoftAzureSettings,
 	awsBedrock: awsBedrockSettings,
+	minimax: minimaxSettings,
 } as const
 
 

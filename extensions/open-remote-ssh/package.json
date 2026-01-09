@@ -339,6 +339,7 @@
     "watch-web": "npx webpack-cli --config extension-browser.webpack.config --mode none --watch --info-verbosity verbose"
   },
   "devDependencies": {
+    "@types/node": "22.15.1",
     "@types/ssh2": "^0.5.52",
     "@types/ssh2-streams": "0.1.12"
   },

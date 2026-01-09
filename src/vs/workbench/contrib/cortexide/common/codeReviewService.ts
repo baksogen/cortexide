@@ -190,7 +190,9 @@ Provide your review annotations as a JSON array:`;
 				};
 			}
 
-			const modelOptions = settings.optionsOfModelSelection['Chat']?.[modelSelection.providerName]?.[modelSelection.modelName];
+			const modelOptions = modelSelection.providerName === 'auto' || modelSelection.modelName === 'auto'
+				? undefined
+				: settings.optionsOfModelSelection['Chat']?.[modelSelection.providerName as keyof typeof settings.optionsOfModelSelection['Chat']]?.[modelSelection.modelName];
 			const overrides = settings.overridesOfModel;
 
 			// Call LLM directly

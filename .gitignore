@@ -29,3 +29,4 @@ product.overrides.json
 .tool-versions
 src/vs/workbench/contrib/cortexide/browser/react/out/**
 src/vs/workbench/contrib/cortexide/browser/react/src2/**
+.claude

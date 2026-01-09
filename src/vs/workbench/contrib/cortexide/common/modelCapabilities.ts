@@ -281,17 +281,12 @@ export const defaultModelsOfProvider = {
 	awsBedrock: [],
 	liteLLM: [],
 	minimax: [
-		// https://platform.minimax.io/docs/guides/text-ai-coding-tools
+		// https://platform.minimax.io/docs/api-reference/text-openai-api
 		// NOTE: Keep this list in sync with Minimax's current models.
-		// Reference: https://platform.minimax.io/docs/api/text/chat (checked 2025-01-09)
-		'MiniMax-M2.1', // Latest M2.1 model with strong reasoning and coding capabilities
-		'MiniMax-Text-01', // Latest reasoning model with strong coding capabilities
-		'MiniMax-Text-01-preview', // Preview version of MiniMax-Text-01
-		'abab6.5s-chat', // Fast model for real-time applications
-		'abab6.5-chat', // Balanced model for general tasks
-		'abab6-chat', // Previous generation model
-		'abab5.5s-chat', // Fast variant of abab5.5
-		'abab5.5-chat', // Previous balanced model
+		// Reference: https://platform.minimax.io/docs/api-reference/text-openai-api (checked 2025-01-09)
+		'MiniMax-M2.1', // Powerful Multi-Language Programming Capabilities (output speed ~60 tps)
+		'MiniMax-M2.1-lightning', // Faster and More Agile (output speed ~100 tps)
+		'MiniMax-M2', // Agentic capabilities, Advanced reasoning
 	],
 
 
@@ -1546,41 +1541,25 @@ const awsBedrockSettings: VoidStaticProviderInfo = {
 
 
 // ---------------- MINIMAX ----------------
-// https://platform.minimax.io/docs/guides/text-ai-coding-tools
+// https://platform.minimax.io/docs/api-reference/text-openai-api
 const minimaxModelOptions = {
-	'MiniMax-Text-01': {
-		contextWindow: 1_000_000, // 1M tokens context (max)
-		reservedOutputTokenSpace: 8_192,
-		cost: { input: 0, output: 0 }, // TODO: Verify pricing
-		downloadable: false,
-		supportsFIM: false,
-		supportsSystemMessage: 'system-role',
-		specialToolFormat: 'openai-style',
-		reasoningCapabilities: {
-			supportsReasoning: true,
-			canTurnOffReasoning: true,
-			canIOReasoning: true,
-			reasoningReservedOutputTokenSpace: 8_192,
-			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
-		},
-	},
-	'MiniMax-Text-01-preview': {
-		contextWindow: 1_000_000,
-		reservedOutputTokenSpace: 8_192,
-		cost: { input: 0, output: 0 }, // TODO: Verify pricing
-		downloadable: false,
-		supportsFIM: false,
-		supportsSystemMessage: 'system-role',
-		specialToolFormat: 'openai-style',
-		reasoningCapabilities: {
-			supportsReasoning: true,
-			canTurnOffReasoning: true,
-			canIOReasoning: true,
-			reasoningReservedOutputTokenSpace: 8_192,
-			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
-		},
-	},
 	'MiniMax-M2.1': {
+		contextWindow: 1_000_000, // 1M tokens context
+		reservedOutputTokenSpace: 8_192,
+		cost: { input: 0, output: 0 }, // TODO: Verify pricing
+		downloadable: false,
+		supportsFIM: false,
+		supportsSystemMessage: 'system-role',
+		specialToolFormat: 'openai-style',
+		reasoningCapabilities: {
+			supportsReasoning: true,
+			canTurnOffReasoning: true,
+			canIOReasoning: true,
+			reasoningReservedOutputTokenSpace: 8_192,
+			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
+		},
+	},
+	'MiniMax-M2.1-lightning': {
 		contextWindow: 1_000_000,
 		reservedOutputTokenSpace: 8_192,
 		cost: { input: 0, output: 0 }, // TODO: Verify pricing
@@ -1596,55 +1575,21 @@ const minimaxModelOptions = {
 			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
 		},
 	},
-	'abab6.5s-chat': {
-		contextWindow: 200_000,
+	'MiniMax-M2': {
+		contextWindow: 1_000_000,
 		reservedOutputTokenSpace: 8_192,
 		cost: { input: 0, output: 0 }, // TODO: Verify pricing
 		downloadable: false,
 		supportsFIM: false,
 		supportsSystemMessage: 'system-role',
 		specialToolFormat: 'openai-style',
-		reasoningCapabilities: false,
-	},
-	'abab6.5-chat': {
-		contextWindow: 200_000,
-		reservedOutputTokenSpace: 8_192,
-		cost: { input: 0, output: 0 }, // TODO: Verify pricing
-		downloadable: false,
-		supportsFIM: false,
-		supportsSystemMessage: 'system-role',
-		specialToolFormat: 'openai-style',
-		reasoningCapabilities: false,
-	},
-	'abab6-chat': {
-		contextWindow: 200_000,
-		reservedOutputTokenSpace: 8_192,
-		cost: { input: 0, output: 0 }, // TODO: Verify pricing
-		downloadable: false,
-		supportsFIM: false,
-		supportsSystemMessage: 'system-role',
-		specialToolFormat: 'openai-style',
-		reasoningCapabilities: false,
-	},
-	'abab5.5s-chat': {
-		contextWindow: 200_000,
-		reservedOutputTokenSpace: 8_192,
-		cost: { input: 0, output: 0 }, // TODO: Verify pricing
-		downloadable: false,
-		supportsFIM: false,
-		supportsSystemMessage: 'system-role',
-		specialToolFormat: 'openai-style',
-		reasoningCapabilities: false,
-	},
-	'abab5.5-chat': {
-		contextWindow: 200_000,
-		reservedOutputTokenSpace: 8_192,
-		cost: { input: 0, output: 0 }, // TODO: Verify pricing
-		downloadable: false,
-		supportsFIM: false,
-		supportsSystemMessage: 'system-role',
-		specialToolFormat: 'openai-style',
-		reasoningCapabilities: false,
+		reasoningCapabilities: {
+			supportsReasoning: true,
+			canTurnOffReasoning: true,
+			canIOReasoning: true,
+			reasoningReservedOutputTokenSpace: 8_192,
+			reasoningSlider: { type: 'budget_slider', min: 1024, max: 8192, default: 4096 },
+		},
 	},
 } as const satisfies Record<string, CortexideStaticModelInfo>
 
